@@ -1,0 +1,73 @@
+﻿<Page x:Class="KitLugia.GUI.Pages.DashboardPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Sistema">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="850" HorizontalAlignment="Left">
+
+            <!-- TÍTULO -->
+            <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{StaticResource TextPrimary}"/>
+
+            <!-- BANNER INFORMATIVO (INFO PC) -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Imagem PC (Usando Emoji como Placeholder) -->
+                    <TextBlock Text="💻" FontSize="48" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtPCName" Text="DESKTOP-NAME" FontSize="20" FontWeight="Bold"/>
+                        <TextBlock x:Name="TxtSpecs" Text="Carregando informações..." FontSize="14" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0"/>
+                        <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,3,0,0"/>
+                    </StackPanel>
+
+                    <!-- Botão Rename -->
+                    <Button Grid.Column="2" Content="Renomear" Background="Transparent" Foreground="{StaticResource AccentColor}" BorderThickness="0" Cursor="Hand"/>
+                </Grid>
+            </Border>
+
+            <!-- A LISTA DE CARTÕES -->
+
+            <!-- Grupo 1 -->
+            <TextBlock Text="Configurações Principais" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="🚀" 
+                    Content="Modo de Desempenho e Tweaks"
+                    ToolTip="Gerenciar otimizações de registro, prioridade de CPU e serviços"
+                    Click="BtnGoToTweaks_Click"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="🗑️" 
+                    Content="Armazenamento e Limpeza"
+                    ToolTip="Limpar arquivos temporários, shaders e bloatware"
+                    Click="BtnGoToCleanup_Click"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="📡" 
+                    Content="Otimizador de Rede (Ping)"
+                    ToolTip="Ajustes de DNS, TCP/IP e Adaptador para menor latência"
+                    Click="BtnGoToNetwork_Click"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="🛡️" 
+                    Content="Privacidade e Segurança"
+                    ToolTip="Verificar Defender, Desativar Telemetria e VBS"
+                    Click="BtnGoToPrivacy_Click"/>
+
+            <!-- Separador -->
+            <TextBlock Text="Ferramentas Avançadas" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,20,0,10" FontWeight="SemiBold"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="🔧" 
+                    Content="Reparo Automático (AIO)"
+                    ToolTip="Ferramentas estilo FixWin para corrigir problemas do sistema"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="🎮" 
+                    Content="Modo Gaming Extremo"
+                    ToolTip="Gerenciador de Planos de Energia e GPU"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,115 @@
+﻿<Page x:Class="KitLugia.GUI.Pages.TweaksPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Tweaks">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
+
+            <TextBlock Text="Desempenho e Tweaks" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Alterações avançadas no registro. Mudanças exigem reinicialização." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- GRUPO 1: JOGOS -->
+            <TextBlock Text="Jogos e Gráficos" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+                    <!-- Item 1: Game Mode -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <!-- Texto Esquerda -->
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Status Texto -->
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Switch -->
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Prioridade de GPU (Game Mode)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Define prioridade 'High' para jogos no registro." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusGame" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkGameMode" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkGameMode_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 2: MPO -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desativar Multi-Plane Overlay (MPO)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Corrige telas piscando e stutters em placas NVIDIA/AMD." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusMPO" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkMPO" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMPO_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- GRUPO 2: SISTEMA -->
+            <TextBlock Text="Sistema e Segurança" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+                    <!-- Item 3: VBS -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desativar Segurança VBS (Ganho de FPS)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Virtualização de Segurança. Desativar aumenta performance em CPU bound." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusVBS" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <!-- ATENÇÃO: Aqui invertemos a lógica. Switch Azul = VBS DESLIGADO (Bom para Gamer) -->
+                        <CheckBox x:Name="ChkVBS" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkVBS_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 4: Bing -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desativar Pesquisa Web (Bing)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove sugestões da internet no Menu Iniciar." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusBing" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkBing" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBing_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- AVISO DE REINÍCIO -->
+            <Border Background="#2D2020" BorderBrush="#503030" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,20,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⚠️" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="16"/>
+                    <TextBlock Text="Alterações nestas configurações exigem que você reinicie o computador para serem aplicadas pelo Windows." 
+                               Foreground="#FFC0C0" VerticalAlignment="Center" FontSize="13"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

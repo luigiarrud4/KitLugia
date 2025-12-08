@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+
+		<!-- Habilita WPF e Windows Forms (para diálogos de pasta) -->
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
+		<ApplicationIcon>Iconarchive-Realistic-Fruits-Yellow-Apple.ico</ApplicationIcon>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Content Include="Iconarchive-Realistic-Fruits-Yellow-Apple.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\KitLugia.Core\KitLugia.Core.csproj" />
+	</ItemGroup>
+
+</Project>

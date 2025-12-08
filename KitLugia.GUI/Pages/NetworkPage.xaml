@@ -1,0 +1,144 @@
+﻿<Page x:Class="KitLugia.GUI.Pages.NetworkPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Rede e Internet">
+
+    <Page.Resources>
+        <!-- TEMPLATE CUSTOMIZADO COM CHECKMARK -->
+        <!-- Esse template exibe um ícone VERDE se a TAG for 'Selected' -->
+        <ControlTemplate x:Key="DnsButtonTemplate" TargetType="Button">
+            <Border x:Name="bdr" Background="#222" CornerRadius="8" BorderThickness="1" BorderBrush="#333" Padding="10">
+                <Grid>
+                    <ContentPresenter VerticalAlignment="Center"/>
+
+                    <!-- CHECKMARK (Canto superior direito, Verde) -->
+                    <!-- Visibilidade inicialmente Colapsed, vira Visible via Trigger abaixo -->
+                    <Border x:Name="CheckBadge" Width="26" Height="26" HorizontalAlignment="Right" VerticalAlignment="Top" 
+                            Background="{StaticResource AccentColor}" CornerRadius="0,7,0,13" Margin="-10,-10,-10,-10"
+                            Visibility="Collapsed">
+                        <TextBlock Text="✓" Foreground="Black" FontWeight="Bold" 
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0,0,3"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <ControlTemplate.Triggers>
+                <!-- Mouse Over -->
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="bdr" Property="Background" Value="#2A2A2A"/>
+                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                </Trigger>
+
+                <!-- Estado "Selected" (Ativado via C# no CodeBehind) -->
+                <Trigger Property="Tag" Value="Selected">
+                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                    <Setter TargetName="bdr" Property="BorderThickness" Value="2"/>
+                    <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,30,30,50" MaxWidth="900">
+
+            <TextBlock Text="Rede e Latência" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Otimizações de conexão para jogos e navegação mais rápida." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- SEÇÃO 1: DNS RÁPIDO -->
+            <TextBlock Text="Gerenciador de DNS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+
+            <Grid Margin="0,0,0,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="15"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="15"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Cloudflare (Usando o Template customizado) -->
+                <Button x:Name="BtnCloudflare" Grid.Column="0" Height="100" Click="BtnDnsCloudflare_Click" Template="{StaticResource DnsButtonTemplate}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="1.1.1.1" FontWeight="Bold" FontSize="18" Foreground="#F48120" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Cloudflare DNS" FontWeight="Bold" FontSize="12" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                        <TextBlock Text="Melhor velocidade" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Google -->
+                <Button x:Name="BtnGoogle" Grid.Column="2" Height="100" Click="BtnDnsGoogle_Click" Template="{StaticResource DnsButtonTemplate}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="8.8.8.8" FontWeight="Bold" FontSize="18" Foreground="#4285F4" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Google Public DNS" FontWeight="Bold" FontSize="12" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                        <TextBlock Text="Maior estabilidade" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Reset (DHCP) -->
+                <Button x:Name="BtnDhcp" Grid.Column="4" Height="100" Click="BtnDnsReset_Click" Template="{StaticResource DnsButtonTemplate}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="AUTO" FontWeight="Bold" FontSize="18" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Padrão (DHCP)" FontWeight="Bold" FontSize="12" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                        <TextBlock Text="Definido pelo roteador" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <!-- LABEL DE STATUS DNS PERSONALIZADO -->
+            <StackPanel Orientation="Horizontal" Margin="5,0,0,25" HorizontalAlignment="Right">
+                <TextBlock Text="Servidor DNS em uso:" Foreground="#888" Margin="0,0,10,0" FontStyle="Italic"/>
+                <TextBlock x:Name="TxtCurrentDnsIp" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold"/>
+            </StackPanel>
+
+            <!-- SEÇÃO 2: TWEAKS AVANÇADOS -->
+            <TextBlock Text="Latência e Ping" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,10,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+
+                    <!-- TCP OPTIMIZER -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Otimizar TCP/IP (Baixa Latência)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa o algoritmo de Nagle (TCPNoDelay) para envio imediato de pacotes." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusTcp" Text="..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTcp" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcp_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- DRIVER OPTIMIZER -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Otimizar Adaptador de Rede (Driver)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa economia de energia, Interrupt Moderation e Offloads." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDriver" Text="..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDriver" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDriver_Click"/>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
+            <!-- LIMPAR CACHE DNS -->
+            <Button Content="🚿  Flush DNS (Limpar Cache de Resolução)" 
+                    Margin="0,30,0,0" Height="50"
+                    Style="{StaticResource SettingsCardStyle}"
+                    ToolTip="Resolve problemas de conexão ao carregar sites."
+                    Tag="⚙️"
+                    Click="BtnFlushDns_Click"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

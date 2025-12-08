@@ -1,0 +1,445 @@
+using Microsoft.Win32;
+using Microsoft.Win32.TaskScheduler; // Requer NuGet: TaskScheduler
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.Versioning;
+using System.Text;
+using IWshRuntimeLibrary; // Requer referência COM: Windows Script Host Object Model
+
+// Resolve ambiguidade entre System.IO.File e IWshRuntimeLibrary.File
+using File = System.IO.File;
+
+namespace KitLugia.Core
+{
+    [SupportedOSPlatform("windows")]
+    public static class StartupManager
+    {
+        #region Leitura e Análise
+
+        public static List<StartupAppDetails> GetStartupAppsWithDetails(bool bypassElevationCheck = false)
+        {
+            var apps = new Dictionary<string, StartupAppDetails>(StringComparer.OrdinalIgnoreCase);
+
+            // Lista de caminhos elevados para verificar se um app do registro já tem uma tarefa admin correspondente
+            var elevatedTaskPaths = bypassElevationCheck ? new HashSet<string>() : GetElevatedTaskExecutablePaths();
+
+            // --- 1. PROCESSAR PASTAS DE INICIALIZAÇÃO ---
+            Action<string, bool> processFolder = (folder, isCommon) =>
+            {
+                if (!Directory.Exists(folder)) return;
+                RegistryKey baseKey = isCommon ? Registry.LocalMachine : Registry.CurrentUser;
+                using var approvedKey = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder");
+
+                foreach (var file in Directory.GetFiles(folder))
+                {
+                    try
+                    {
+                        string name = Path.GetFileNameWithoutExtension(file);
+                        if (apps.ContainsKey(name)) continue;
+
+                        string commandLine = GetCommandLineFromShortcut(file);
+                        ExtractCommandParts(commandLine, out string? exePath, out _);
+
+                        var value = approvedKey?.GetValue(Path.GetFileName(file)) as byte[];
+                        bool isEnabled = value == null || value.Length < 1 || value[0] == 2 || value[0] == 0;
+
+                        var status = (exePath != null && elevatedTaskPaths.Contains(exePath)) ? StartupStatus.Elevated : (isEnabled ? StartupStatus.Enabled : StartupStatus.Disabled);
+
+                        apps.Add(name, new StartupAppDetails(name, commandLine, folder, status));
+                    }
+                    catch { }
+                }
+            };
+
+            // --- 2. PROCESSAR REGISTRO (RUN / RUNONCE) ---
+            Action<RegistryKey, string, string[]> processRegistryKeys = (baseKey, locationPrefix, paths) =>
+            {
+                foreach (var path in paths)
+                {
+                    using var key = baseKey.OpenSubKey(path);
+                    if (key == null) continue;
+
+                    string approvedKeyPath = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\{Path.GetFileName(path)}";
+                    if (locationPrefix.Contains("WOW6432Node")) { approvedKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run32"; }
+                    using var approvedKey = baseKey.OpenSubKey(approvedKeyPath);
+
+                    foreach (var valueName in key.GetValueNames())
+                    {
+                        if (string.IsNullOrEmpty(valueName) || apps.ContainsKey(valueName)) continue;
+                        var commandLine = key.GetValue(valueName)?.ToString() ?? "";
+
+                        ExtractCommandParts(commandLine, out string? exePath, out _);
+
+                        var value = approvedKey?.GetValue(valueName) as byte[];
+                        bool isEnabled = value == null || value.Length < 1 || (value[0] % 2 == 0);
+
+                        var status = (exePath != null && elevatedTaskPaths.Contains(exePath)) ? StartupStatus.Elevated : (isEnabled ? StartupStatus.Enabled : StartupStatus.Disabled);
+
+                        apps.Add(valueName, new StartupAppDetails(valueName, commandLine, $"{locationPrefix}\\{path}", status));
+                    }
+                }
+            };
+
+            processFolder(Environment.GetFolderPath(Environment.SpecialFolder.Startup), false);
+            processFolder(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), true);
+            string[] regPaths = { @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce" };
+            processRegistryKeys(Registry.CurrentUser, "HKCU", regPaths);
+            processRegistryKeys(Registry.LocalMachine, "HKLM", regPaths);
+            if (Environment.Is64BitOperatingSystem)
+            {
+                processRegistryKeys(Registry.LocalMachine, @"HKLM\WOW6432Node", new[] { @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run" });
+            }
+
+            // --- 3. PROCESSAR TAREFAS DO AGENDADOR (KITLUGIA) ---
+            try
+            {
+                using (var ts = new TaskService())
+                {
+                    var lugiaTasks = ts.RootFolder.Tasks.Where(t => t.Name.StartsWith("KitLUGIA_"));
+
+                    foreach (var task in lugiaTasks)
+                    {
+                        string rawName = task.Name;
+                        string cleanName = rawName.Replace("KitLUGIA_Elevated_", "").Replace("KitLUGIA_Delayed_", "");
+
+                        string fullCommand = "";
+                        if (task.Definition.Actions.FirstOrDefault() is ExecAction action)
+                        {
+                            fullCommand = $"\"{action.Path}\" {action.Arguments}".Trim();
+                        }
+
+                        bool isTaskEnabled = task.Enabled;
+                        StartupStatus status;
+
+                        if (!isTaskEnabled)
+                            status = StartupStatus.Disabled;
+                        else
+                            status = rawName.Contains("Elevated") ? StartupStatus.Elevated : StartupStatus.Enabled;
+
+                        if (apps.ContainsKey(cleanName))
+                        {
+                            var existing = apps[cleanName];
+                            existing.Status = status;
+                            existing.Location = "Agendador de Tarefas (KitLugia)";
+                        }
+                        else
+                        {
+                            apps.Add(cleanName, new StartupAppDetails(cleanName, fullCommand, "Agendador de Tarefas (KitLugia)", status));
+                        }
+                    }
+                }
+            }
+            catch { /* Ignora erros de permissão */ }
+
+            return apps.Values.OrderBy(a => a.Name).ToList();
+        }
+
+        #endregion
+
+        #region Gerenciamento de Estado (Habilitar/Desabilitar/Remover)
+
+        public static (bool Success, string Message) SetStartupItemState(string appName, bool enable, bool silentMode = false)
+        {
+            var startupApp = GetStartupAppsWithDetails(true).FirstOrDefault(app => app.Name.Equals(appName, StringComparison.OrdinalIgnoreCase));
+            if (startupApp == null) return (false, "App não encontrado.");
+
+            // CASO 1: Tarefa do Agendador (KitLugia)
+            if (startupApp.Location.Contains("Agendador"))
+            {
+                try
+                {
+                    using (var ts = new TaskService())
+                    {
+                        // Busca flexível para encontrar qualquer variante do nome
+                        var task = ts.RootFolder.Tasks.FirstOrDefault(t => t.Name.Contains(appName) && t.Name.StartsWith("KitLUGIA_"));
+                        if (task != null)
+                        {
+                            task.Definition.Settings.Enabled = enable;
+                            ts.RootFolder.RegisterTaskDefinition(task.Name, task.Definition, TaskCreation.Update, null, null, task.Definition.Principal.LogonType);
+
+                            string actionMsg = enable ? "Habilitado" : "Desabilitado";
+                            return (true, silentMode ? "" : $"Item agendado '{appName}' foi {actionMsg}.");
+                        }
+                    }
+                    return (false, "Tarefa agendada não encontrada.");
+                }
+                catch (Exception ex)
+                {
+                    return (false, $"Erro ao alterar tarefa: {ex.Message}");
+                }
+            }
+
+            // CASO 2: Registro ou Pasta de Inicialização
+            try
+            {
+                string regPath;
+                RegistryKey baseKey;
+                string valueNameToChange = appName;
+
+                if (startupApp.Location.StartsWith("HKCU"))
+                {
+                    baseKey = Registry.CurrentUser;
+                    regPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+                }
+                else if (startupApp.Location.StartsWith("HKLM"))
+                {
+                    baseKey = Registry.LocalMachine;
+                    regPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+                }
+                else if (startupApp.Location.Contains("Startup"))
+                {
+                    baseKey = Registry.CurrentUser;
+                    regPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder";
+                    valueNameToChange = appName + ".lnk";
+                }
+                else { return (false, "Localização não suportada."); }
+
+                byte[] valueToSet = enable ? new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } : new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+                using (var key = baseKey.OpenSubKey(regPath, true) ?? baseKey.CreateSubKey(regPath))
+                {
+                    if (key.GetValue(valueNameToChange) != null)
+                    {
+                        key.SetValue(valueNameToChange, valueToSet, RegistryValueKind.Binary);
+                    }
+                    else
+                    {
+                        string fallbackName = GetFileNameFromCommandLine(startupApp.FullCommand);
+                        key.SetValue(fallbackName, valueToSet, RegistryValueKind.Binary);
+                    }
+                }
+                return (true, silentMode ? "" : $"'{appName}' {(enable ? "Habilitado" : "Desabilitado")}.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) RemoveStartupItem(string appName)
+        {
+            var startupApp = GetStartupAppsWithDetails(true).FirstOrDefault(app => app.Name.Equals(appName, StringComparison.OrdinalIgnoreCase));
+            if (startupApp == null) return (false, "Aplicativo não encontrado na lista.");
+
+            try
+            {
+                if (startupApp.Location.Contains("Agendador"))
+                {
+                    using (var ts = new TaskService())
+                    {
+                        var task = ts.RootFolder.Tasks.FirstOrDefault(t => t.Name.Contains(appName) && t.Name.StartsWith("KitLUGIA_"));
+                        if (task != null)
+                        {
+                            ts.RootFolder.DeleteTask(task.Name);
+                            return (true, $"Tarefa '{appName}' removida do agendador.");
+                        }
+                    }
+                }
+                else if (startupApp.Location.Contains("\\Startup") || startupApp.Location.Contains("\\Start Menu"))
+                {
+                    string lnkPath = Path.Combine(startupApp.Location, appName + ".lnk");
+                    if (File.Exists(lnkPath))
+                    {
+                        File.Delete(lnkPath);
+                        return (true, $"Atalho '{appName}' deletado permanentemente.");
+                    }
+                    var looseFile = Directory.GetFiles(startupApp.Location, $"{appName}.*").FirstOrDefault();
+                    if (looseFile != null)
+                    {
+                        File.Delete(looseFile);
+                        return (true, $"Arquivo '{Path.GetFileName(looseFile)}' deletado permanentemente.");
+                    }
+                }
+                else if (startupApp.Location.StartsWith("HK"))
+                {
+                    RegistryKey baseKey = startupApp.Location.StartsWith("HKLM") ? Registry.LocalMachine : Registry.CurrentUser;
+                    string subKeyPath = startupApp.Location.Substring(startupApp.Location.IndexOf('\\') + 1);
+
+                    using (var key = baseKey.OpenSubKey(subKeyPath, true))
+                    {
+                        if (key != null && key.GetValue(appName) != null)
+                        {
+                            key.DeleteValue(appName);
+                            return (true, $"Entrada de registro '{appName}' removida.");
+                        }
+                    }
+                }
+
+                return (false, "Não foi possível localizar o item físico para remoção.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao remover item: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Gerenciamento de Tarefas (Elevadas/Atrasadas)
+
+        public static List<string> GetElevatedStartupTaskFullNames()
+        {
+            using (var ts = new TaskService())
+            {
+                return ts.RootFolder.Tasks
+                    .Where(task => task.Name.StartsWith("KitLUGIA_"))
+                    .Select(task => task.Name)
+                    .ToList();
+            }
+        }
+
+        // --- AS 4 OPÇÕES DE CRIAÇÃO ---
+
+        public static (bool Success, string Message) CreateDelayedStartupTask(string appName, string appPath, string? arguments)
+        {
+            return CreateTaskInternal(appName, appPath, arguments, elevated: false, forceLongDelay: false);
+        }
+
+        public static (bool Success, string Message) CreateElevatedStartupTask(string appName, string appPath, string? arguments)
+        {
+            return CreateTaskInternal(appName, appPath, arguments, elevated: true, forceLongDelay: false);
+        }
+
+        public static (bool Success, string Message) CreateElevatedDelayedStartupTask(string appName, string appPath, string? arguments)
+        {
+            return CreateTaskInternal(appName, appPath, arguments, elevated: true, forceLongDelay: true);
+        }
+
+        private static (bool Success, string Message) CreateTaskInternal(string appName, string appPath, string? arguments, bool elevated, bool forceLongDelay)
+        {
+            try
+            {
+                using (var ts = new TaskService())
+                {
+                    string prefix = elevated ? "KitLUGIA_Elevated_" : "KitLUGIA_Delayed_";
+                    string taskName = $"{prefix}{appName}";
+
+                    if (ts.FindTask(taskName) != null) ts.RootFolder.DeleteTask(taskName);
+
+                    var td = ts.NewTask();
+                    td.RegistrationInfo.Description = $"Startup task for {appName} by KitLUGIA (Elevated: {elevated}, Delayed: {forceLongDelay})";
+
+                    td.Principal.RunLevel = elevated ? TaskRunLevel.Highest : TaskRunLevel.LUA;
+
+                    var trigger = new LogonTrigger();
+
+                    // Lógica de Tempo:
+                    if (forceLongDelay)
+                    {
+                        trigger.Delay = TimeSpan.FromMinutes(2); // Força 2 min
+                    }
+                    else if (elevated)
+                    {
+                        trigger.Delay = TimeSpan.FromSeconds(5); // Padrão admin
+                    }
+                    else
+                    {
+                        trigger.Delay = TimeSpan.FromMinutes(2); // Padrão delayed
+                    }
+
+                    td.Triggers.Add(trigger);
+                    td.Actions.Add(new ExecAction(appPath, arguments, Path.GetDirectoryName(appPath)));
+
+                    td.Settings.DisallowStartIfOnBatteries = false;
+                    td.Settings.StopIfGoingOnBatteries = false;
+                    td.Settings.ExecutionTimeLimit = TimeSpan.Zero;
+
+                    ts.RootFolder.RegisterTaskDefinition(taskName, td);
+                }
+
+                SetStartupItemState(appName, false, true);
+
+                string typeMsg = elevated ? "ADMIN" : "NORMAL";
+                string delayMsg = forceLongDelay || (!elevated) ? "+ ATRASO" : "";
+                return (true, $"Tarefa '{typeMsg} {delayMsg}' criada para {appName}.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao agendar tarefa: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) RemoveElevatedStartupTask(string fullTaskName)
+        {
+            try
+            {
+                string cleanName = fullTaskName.Replace("KitLUGIA_Elevated_", "").Replace("KitLUGIA_Delayed_", "");
+                SetStartupItemState(cleanName, true, true);
+
+                using (var ts = new TaskService())
+                {
+                    ts.RootFolder.DeleteTask(fullTaskName);
+                    return (true, "Tarefa removida. Tentativa de restaurar inicialização padrão feita.");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Helpers
+
+        private static void ExtractCommandParts(string commandLine, out string? path, out string? args)
+        {
+            path = null; args = "";
+            if (string.IsNullOrWhiteSpace(commandLine)) return;
+            commandLine = Environment.ExpandEnvironmentVariables(commandLine.Trim());
+
+            if (commandLine.StartsWith("\""))
+            {
+                int endQuote = commandLine.IndexOf('"', 1);
+                if (endQuote > 0)
+                {
+                    path = commandLine.Substring(1, endQuote - 1);
+                    if (endQuote < commandLine.Length - 1) args = commandLine.Substring(endQuote + 1).Trim();
+                    return;
+                }
+            }
+            int space = commandLine.IndexOf(' ');
+            if (space > 0) { path = commandLine.Substring(0, space); args = commandLine.Substring(space + 1).Trim(); }
+            else { path = commandLine; }
+        }
+
+        private static string GetCommandLineFromShortcut(string shortcutPath)
+        {
+            if (!shortcutPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) return $"\"{shortcutPath}\"";
+            try
+            {
+                var shell = new WshShell();
+                var shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+                return $"\"{shortcut.TargetPath}\" {shortcut.Arguments}".Trim();
+            }
+            catch { return ""; }
+        }
+
+        private static string GetFileNameFromCommandLine(string cmd)
+        {
+            ExtractCommandParts(cmd, out string? p, out _);
+            return Path.GetFileName(p ?? "");
+        }
+
+        private static HashSet<string> GetElevatedTaskExecutablePaths()
+        {
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                using (var ts = new TaskService())
+                {
+                    foreach (var task in ts.RootFolder.Tasks.Where(t => t.Name.StartsWith("KitLUGIA_Elevated_")))
+                    {
+                        if (task.Definition.Actions.FirstOrDefault() is ExecAction action) paths.Add(action.Path);
+                    }
+                }
+            }
+            catch { }
+            return paths;
+        }
+
+        #endregion
+    }
+}
