@@ -274,7 +274,7 @@ Armazenamento: 2 GB de espaço livre
 Placa de Vídeo: DirectX 12 compatible
 ```
 
-### 🚀 **Recomendados**
+### 🚀 **Recomendados** (ilustrativo funciona até com pentium so precisa mesmo do windows 11)
 ```
 Sistema Operacional: Windows 11 24H2
 Processador: Intel i7 / AMD Ryzen 7 ou superior
