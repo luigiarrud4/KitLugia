@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![KitLugia](https://github.com/luigiarrud4/KitLugia/raw/master/KitLugia.GUI/Iconarchive-Realistic-Fruits-Yellow-Apple.ico)
+![KitLugia](https://github.com/luigiarrud4/KitLugia/raw/master/KitLugia.GUI/Iconarchive-Realistic-Fruits-Yellow-Apple.png)
 
 **🎯 200+ Funcionalidades • 🛡️ 40+ Vulnerabilidades Zero-Day • 🎮 Game Boost 10x Mais Rápido**
 
