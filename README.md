@@ -235,11 +235,11 @@ dotnet publish KitLugia.GUI -c Release -r win-x64 --self-contained true -p:Publi
 
 ---
 
-## 🔧 ****
+## 🔧 **Configurando...**
 
 ### 🎮 **Para Gamers**
 
-1. **Abra** o KitLugia
+1. **Abra** o KitLugia na pagina inicial clique no botão verde **"Otimização INTELIGENTE"** conclua os passos e clique **OTIMIZAR**
 2. **Vá** para as página **"Desempenho"** ative todas as opções do começo so não ative as ultimas **(SLIDE)**
 3. **Ative** o **"Game Boost"** na parte do **"Monitor Tray"** e ative as opções: **Iniciar com o windows, Game boost, Icone de bandeja**
 4. **Inicie** seu jogo favorito
