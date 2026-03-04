@@ -1,50 +1,33 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Runtime.Versioning;
 
 namespace KitLugia.Core
 {
-    // --- ENUMS ESSENCIAIS ---
+    // --- ENUMS ---
     public enum TweakType { Registry, Service, Mouse, Bcd, PageFile, GpuInterruptPriority }
     public enum TweakStatus { OK, MODIFIED, ERROR, NOT_FOUND }
-    public enum StartupStatus { Disabled, Enabled, Elevated }
+    public enum StartupStatus { Disabled, Enabled, Elevated, TurboBoot }
     public enum ActionType { BuiltIn, GenericCommand, Script }
     public enum ServiceSafetyLevel { Safe, Caution, Dangerous, Unknown }
 
-    // --- MODELO DO BOTÃO DE REPARO (Novo AIO) ---
+    // --- REPAIR ACTION ---
     public class RepairAction
     {
-        // Identificação Única (útil para logs)
         public string Id { get; set; } = Guid.NewGuid().ToString();
-
-        // Texto do Botão
         public string Name { get; set; } = string.Empty;
-
-        // Tooltip e Texto Descritivo
         public string Description { get; set; } = string.Empty;
-
-        // Categoria para o Menu Lateral (ex: "Internet", "Explorer")
         public string Category { get; set; } = "Geral";
-
-        // Ícone/Emoji para a Interface
         public string Icon { get; set; } = "🔧";
-
-        // O código C# que será executado ao clicar
         public Action? Execute { get; set; }
-
-        // Se true, a GUI exibirá um popup de "Tem certeza?"
         public bool IsDangerous { get; set; } = false;
-
-        // Flag de interface (se está marcado num modo batch, por exemplo)
         public bool IsSelected { get; set; } = false;
-
-        // Se true, indica que abre uma janela externa (ex: sfc /scannow)
         public bool IsSlow { get; set; } = false;
     }
 
-    // --- DEMAIS DTOs DO SISTEMA ---
-
+    // --- STARTUP APP ---
     public class StartupAppDetails
     {
         public string Name { get; set; }
@@ -54,26 +37,61 @@ namespace KitLugia.Core
 
         public StartupAppDetails(string name, string fullCommand, string location, StartupStatus status)
         {
-            Name = name; FullCommand = fullCommand; Location = location; Status = status;
+            Name = name;
+            FullCommand = fullCommand;
+            Location = location;
+            Status = status;
         }
     }
 
-    public class ServiceInfo
+    public record ServiceInfo(string Name, string DisplayName, string Description, string Status, string StartMode, ServiceSafetyLevel Safety);
+
+    // --- DRIVER ITEM ---
+    [SupportedOSPlatform("windows")]
+    public class DriverItem : INotifyPropertyChanged
     {
-        public string Name { get; set; }
-        public string DisplayName { get; set; }
-        public string Description { get; set; }
-        public string Status { get; set; }
-        public string StartMode { get; set; }
-        public ServiceSafetyLevel Safety { get; set; }
+        public string DeviceName { get; set; } = "";
+        public string Provider { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string Date { get; set; } = "";
+        public string InfName { get; set; } = "";
+        public string HardwareId { get; set; } = "";
+        public object? WindowsUpdateObj { get; set; }
 
-        public ServiceInfo(string name, string display, string desc, string status, string startMode, ServiceSafetyLevel safety)
+        // Campos de automação
+        private bool _isSelected;
+        public bool IsSelected
         {
-            Name = name; DisplayName = display; Description = desc; Status = status; StartMode = startMode; Safety = safety;
+            get => _isSelected;
+            set { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); }
         }
+
+        private string _updateStatus = "Verificado";
+        public string UpdateStatus
+        {
+            get => _updateStatus;
+            set { _updateStatus = value; OnPropertyChanged(nameof(UpdateStatus)); }
+        }
+
+        public string Icon
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(Provider)) return "🔌";
+                if (Provider.Contains("NVIDIA") || Provider.Contains("AMD") || Provider.Contains("Intel")) return "📺";
+                if (Provider.Contains("Realtek") || Provider.Contains("Audio") || Provider.Contains("Sound")) return "🔊";
+                if (Provider.Contains("Ethernet") || Provider.Contains("Wireless") || Provider.Contains("Network")) return "🌐";
+                if (Provider.Contains("Bluetooth")) return "🦷";
+                if (Provider.Contains("USB")) return "🔌";
+                return "⚙️";
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
-    // --- RECORDS (Imutáveis para leitura rápida) ---
+    // --- OUTROS RECORDS ---
     public record PowerPlanInfo(string Guid, string Name, bool IsActive);
     public record BloatwareApp(string DisplayName, string PackageName, bool IsInstalled, string StoreId = "");
     public record PerformanceEvent(int EventId, string ItemName, long TimeTaken, string EventType, DateTime? TimeOfEvent, string SubType = "");
@@ -91,10 +109,15 @@ namespace KitLugia.Core
         public List<PerformanceEvent> HighImpactApps { get; set; } = new();
     }
 
+    // --- CLASSE TWEAK (ATUALIZADA COM DESCRIÇÃO) ---
     [SupportedOSPlatform("windows")]
     public class ScannableTweak
     {
         public string Name { get; set; } = string.Empty;
+
+        // CAMPO NOVO QUE FALTAVA:
+        public string Description { get; set; } = "Sem descrição disponível.";
+
         public TweakType Type { get; set; } = TweakType.Registry;
         public string Category { get; set; } = string.Empty;
         public TweakStatus Status { get; set; }
@@ -106,5 +129,40 @@ namespace KitLugia.Core
         public string? ServiceName { get; set; }
         public string? HarmfulStartMode { get; set; }
         public string? DefaultStartMode { get; set; }
+    }
+    // --- WINBOOT MODELS ---
+    public class DiskInfo
+    {
+        public uint Index { get; set; }
+        public string Model { get; set; } = string.Empty;
+        public string Interface { get; set; } = string.Empty;
+        public ulong Size { get; set; }
+        public string SizeString => $"{(Size / (1024.0 * 1024 * 1024)):F2} GB";
+        public List<PartitionInfo> Partitions { get; set; } = new List<PartitionInfo>();
+        public string DisplayName => $"Disco {Index}: {Model} ({Interface}) - {SizeString}";
+    }
+
+    public class PartitionInfo
+    {
+        public uint Index { get; set; }
+        public uint DiskIndex { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string DriveLetter { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string FileSystem { get; set; } = string.Empty;
+        public ulong Size { get; set; }
+        public ulong FreeSpace { get; set; }
+        public string SizeString => $"{(Size / (1024.0 * 1024 * 1024)):F2} GB";
+        public string FreeSpaceString => $"{(FreeSpace / (1024.0 * 1024 * 1024)):F2} GB";
+        
+        // Propriedade de segurança para o usuário
+        public bool IsSafeToUse => Size >= (8L * 1024 * 1024 * 1024) && 
+                                  !Label.Contains("Sistema", StringComparison.OrdinalIgnoreCase) && 
+                                  !Label.Contains("EFI", StringComparison.OrdinalIgnoreCase) && 
+                                  !Label.Contains("Reservado", StringComparison.OrdinalIgnoreCase);
+
+        public string DisplayName => string.IsNullOrEmpty(DriveLetter) 
+            ? $"Partição {Name} ({FileSystem}) - {SizeString}"
+            : $"{DriveLetter} ({Label}) [{FileSystem}] - {FreeSpaceString} livres de {SizeString}";
     }
 }

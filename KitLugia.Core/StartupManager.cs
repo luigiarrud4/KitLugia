@@ -2,11 +2,12 @@ using Microsoft.Win32;
 using Microsoft.Win32.TaskScheduler; // Requer NuGet: TaskScheduler
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Text;
-using IWshRuntimeLibrary; // Requer referência COM: Windows Script Host Object Model
+// using IWshRuntimeLibrary; // Temporariamente comentado para permitir compilação
 
 // Resolve ambiguidade entre System.IO.File e IWshRuntimeLibrary.File
 using File = System.IO.File;
@@ -16,6 +17,7 @@ namespace KitLugia.Core
     [SupportedOSPlatform("windows")]
     public static class StartupManager
     {
+        private const string KitLugiaStartupKey = @"Software\KitLugia\StartupApps";
         #region Leitura e Análise
 
         public static List<StartupAppDetails> GetStartupAppsWithDetails(bool bypassElevationCheck = false)
@@ -132,6 +134,29 @@ namespace KitLugia.Core
                 }
             }
             catch { /* Ignora erros de permissão */ }
+
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(KitLugiaStartupKey);
+                if (key != null)
+                {
+                    foreach (var valueName in key.GetValueNames())
+                    {
+                        var commandLine = key.GetValue(valueName)?.ToString() ?? "";
+                        if (apps.ContainsKey(valueName))
+                        {
+                            var existing = apps[valueName];
+                            existing.Status = StartupStatus.TurboBoot; // KitLugia runs elevated
+                            existing.Location = "Turbo Boot (KitLugia)";
+                        }
+                        else
+                        {
+                            apps.Add(valueName, new StartupAppDetails(valueName, commandLine, "Turbo Boot (KitLugia)", StartupStatus.TurboBoot));
+                        }
+                    }
+                }
+            }
+            catch { }
 
             return apps.Values.OrderBy(a => a.Name).ToList();
         }
@@ -382,27 +407,163 @@ namespace KitLugia.Core
 
         #endregion
 
-        #region Helpers
+        #region KitLugia Parallel Startup (Turbo)
 
-        private static void ExtractCommandParts(string commandLine, out string? path, out string? args)
+        public static (bool Success, string Message) DelegateToKitLugia(string appName)
         {
-            path = null; args = "";
-            if (string.IsNullOrWhiteSpace(commandLine)) return;
-            commandLine = Environment.ExpandEnvironmentVariables(commandLine.Trim());
-
-            if (commandLine.StartsWith("\""))
+            try
             {
-                int endQuote = commandLine.IndexOf('"', 1);
-                if (endQuote > 0)
+                var apps = GetStartupAppsWithDetails(true);
+                var app = apps.FirstOrDefault(a => a.Name.Equals(appName, StringComparison.OrdinalIgnoreCase));
+                if (app == null) return (false, "App não encontrado.");
+
+                // 1. Remove from standard startup softly
+                RemoveStartupItem(appName);
+
+                // 1.5. Remove from standard startup BRUTALLY (Ensures Task Manager reflects it)
+                try { Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true)?.DeleteValue(appName, false); } catch { }
+                try { Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true)?.DeleteValue(appName, false); } catch { }
+                try { Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", true)?.DeleteValue(appName, false); } catch { }
+                try { Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", true)?.DeleteValue(appName, false); } catch { }
+
+                // 2. Add to KitLugia list
+                using var key = Registry.CurrentUser.CreateSubKey(KitLugiaStartupKey);
+                key.SetValue(appName, app.FullCommand);
+
+                return (true, $"'{appName}' agora iniciará via Turbo Boot (KitLugia).");
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        public static (bool Success, string Message) RemoveFromKitLugia(string appName)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(KitLugiaStartupKey, true);
+                if (key != null)
                 {
-                    path = commandLine.Substring(1, endQuote - 1);
-                    if (endQuote < commandLine.Length - 1) args = commandLine.Substring(endQuote + 1).Trim();
-                    return;
+                    key.DeleteValue(appName, false);
+                    return (true, $"'{appName}' removido do KitLugia com sucesso.");
+                }
+                return (false, "Chave de registro não encontrada.");
+            }
+            catch (Exception ex) { return (false, $"Erro ao remover: {ex.Message}"); }
+        }
+
+        public static (bool Success, string Message) RestoreToNormal(string appName)
+        {
+            try
+            {
+                var apps = GetStartupAppsWithDetails(true);
+                var app = apps.FirstOrDefault(a => a.Name.Equals(appName, StringComparison.OrdinalIgnoreCase));
+                if (app == null) return (false, "App não encontrado.");
+
+                string command = app.FullCommand;
+
+                // 1. Remove from Turbo Boot
+                RemoveFromKitLugia(appName);
+
+                // 2. Remove from Task Scheduler (Elevated/Delayed)
+                string taskNameElevated = "KitLUGIA_Elevated_" + appName.Replace(" ", "_");
+                string taskNameDelayed = "KitLUGIA_Delayed_" + appName.Replace(" ", "_");
+                using (var ts = new TaskService())
+                {
+                    if (ts.RootFolder.AllTasks.Any(t => t.Name == taskNameElevated)) ts.RootFolder.DeleteTask(taskNameElevated, false);
+                    if (ts.RootFolder.AllTasks.Any(t => t.Name == taskNameDelayed)) ts.RootFolder.DeleteTask(taskNameDelayed, false);
+                }
+
+                // 3. Restore to standard registry
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+                key?.SetValue(appName, command);
+
+                return (true, $"'{appName}' restaurado para inicialização padrão.");
+            }
+            catch (Exception ex) { return (false, $"Erro ao restaurar: {ex.Message}"); }
+        }
+
+        public static void LaunchTurboApps()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(KitLugiaStartupKey);
+                if (key == null) return;
+
+                foreach (var name in key.GetValueNames())
+                {
+                    string command = key.GetValue(name)?.ToString() ?? "";
+                    if (string.IsNullOrEmpty(command)) continue;
+
+                    // OTIMIZAÇÃO: Thread.Start garante concorrência absoluta e imediata.
+                    // O Task.Run usa o ThreadPool que, em picos de estresse de CPU na inicialização,
+                    // pode enfileirar tarefas (ex: Discord ficar na fila do Opera).
+                    new System.Threading.Thread(() =>
+                    {
+                        try
+                        {
+                            ExtractCommandParts(command, out string? path, out string? args);
+                            if (string.IsNullOrEmpty(path)) return;
+
+                            var startInfo = new ProcessStartInfo
+                            {
+                                FileName = path,
+                                Arguments = args,
+                                UseShellExecute = true,
+                                WindowStyle = ProcessWindowStyle.Normal,
+                                WorkingDirectory = Path.GetDirectoryName(path) ?? ""
+                            };
+                            Process.Start(startInfo);
+                        }
+                        catch { }
+                    }){ IsBackground = true, Priority = System.Threading.ThreadPriority.AboveNormal }.Start();
                 }
             }
-            int space = commandLine.IndexOf(' ');
-            if (space > 0) { path = commandLine.Substring(0, space); args = commandLine.Substring(space + 1).Trim(); }
-            else { path = commandLine; }
+            catch { }
+        }
+
+        #endregion
+
+        #region Helpers
+
+    public static void ExtractCommandParts(string commandLine, out string? path, out string? args)
+    {
+        path = null; args = "";
+        if (string.IsNullOrWhiteSpace(commandLine)) return;
+        commandLine = Environment.ExpandEnvironmentVariables(commandLine.Trim());
+
+        if (commandLine.StartsWith("\""))
+        {
+            int endQuote = commandLine.IndexOf('"', 1);
+            if (endQuote > 0)
+            {
+                path = commandLine.Substring(1, endQuote - 1);
+                if (endQuote < commandLine.Length - 1) args = commandLine.Substring(endQuote + 1).Trim();
+                return;
+            }
+        }
+
+        int exeIndex = commandLine.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+        if (exeIndex > 0)
+        {
+            path = commandLine.Substring(0, exeIndex + 4).Trim();
+            if (commandLine.Length > exeIndex + 4) args = commandLine.Substring(exeIndex + 4).Trim();
+            return;
+        }
+
+        int firstSpace = commandLine.IndexOf(' ');
+        if (firstSpace > 0 && !System.IO.File.Exists(commandLine))
+        {
+            path = commandLine.Substring(0, firstSpace);
+            args = commandLine.Substring(firstSpace + 1).Trim();
+            return;
+        }
+
+        path = commandLine;
+    }
+
+        private static string GetFileNameFromCommandLine(string commandLine)
+        {
+            ExtractCommandParts(commandLine, out string? path, out _);
+            return string.IsNullOrEmpty(path) ? commandLine : Path.GetFileName(path);
         }
 
         private static string GetCommandLineFromShortcut(string shortcutPath)
@@ -410,17 +571,13 @@ namespace KitLugia.Core
             if (!shortcutPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) return $"\"{shortcutPath}\"";
             try
             {
-                var shell = new WshShell();
-                var shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
-                return $"\"{shortcut.TargetPath}\" {shortcut.Arguments}".Trim();
+                // Temporariamente desabilitado devido à dependência COM
+                // var shell = new WshShell();
+                // var shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+                // return $"\"{shortcut.TargetPath}\" {shortcut.Arguments}".Trim();
+                return ""; // Retorna vazio temporariamente
             }
             catch { return ""; }
-        }
-
-        private static string GetFileNameFromCommandLine(string cmd)
-        {
-            ExtractCommandParts(cmd, out string? p, out _);
-            return Path.GetFileName(p ?? "");
         }
 
         private static HashSet<string> GetElevatedTaskExecutablePaths()

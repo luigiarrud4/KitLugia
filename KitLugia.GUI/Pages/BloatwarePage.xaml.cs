@@ -2,12 +2,13 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using MessageBox = System.Windows.MessageBox;
 using KitLugia.Core;
 using KitLugia.GUI.Controls;
 
 // --- CORREÇÃO DOS CONFLITOS DE AMBIGUIDADE ---
 using Button = System.Windows.Controls.Button;
-using MessageBox = System.Windows.MessageBox;
+
 using Application = System.Windows.Application;
 
 namespace KitLugia.GUI.Pages
@@ -23,7 +24,7 @@ namespace KitLugia.GUI.Pages
             LoadApps();
         }
 
-        private async void LoadApps()
+        private async Task LoadApps()
         {
             if (LoadingPanel != null) LoadingPanel.Visibility = Visibility.Visible;
             if (AppsList != null) AppsList.ItemsSource = null;
@@ -71,9 +72,9 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void BtnRefresh_Click(object sender, RoutedEventArgs e)
+        private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
-            LoadApps();
+            await LoadApps();
         }
     }
 }

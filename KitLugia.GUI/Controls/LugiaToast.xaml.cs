@@ -9,7 +9,8 @@ using UserControl = System.Windows.Controls.UserControl;
 
 namespace KitLugia.GUI.Controls
 {
-    public enum NotificationType { Info, Success, Error }
+    // AQUI ESTAVA O ERRO: A linha "public enum NotificationType..." foi REMOVIDA.
+    // O sistema agora vai ler o Enum do arquivo Enums.cs que você criou antes.
 
     public partial class LugiaToast : UserControl, INotifyPropertyChanged
     {
@@ -17,21 +18,21 @@ namespace KitLugia.GUI.Controls
         private bool _isDismissing = false;
         private DispatcherTimer _lifeTimer;
 
-        // Controle de Spam (Auto Clicker)
+        // Variáveis para o contador e proteção contra spam visual
+        private int _count = 1;
         private long _lastAnimationTick = 0;
 
+        // Identificador único para saber se é duplicata
         public string NotificationId { get; private set; } = string.Empty;
         public NotificationType ToastType { get; private set; }
-
-        private int _count = 1;
 
         public LugiaToast()
         {
             InitializeComponent();
             this.DataContext = this;
 
-            // Vida útil (3s)
-            _lifeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            // Define o tempo de vida (4 segundos)
+            _lifeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
             _lifeTimer.Tick += (s, e) => Dismiss();
         }
 
@@ -42,8 +43,9 @@ namespace KitLugia.GUI.Controls
             ToastType = type;
             SetValue(ToastTypeProperty, type);
 
-            if (type == NotificationType.Info)
-                NotificationId = "GENERIC_INFO_SLOT";
+            // Gera o ID. Se for apenas "Info" genérico, usa um ID fixo para agrupar todas as infos.
+            if (type == NotificationType.Info && title == "AGUARDE")
+                NotificationId = "GENERIC_WAIT";
             else
                 NotificationId = $"{type}|{title}|{message}";
 
@@ -56,25 +58,28 @@ namespace KitLugia.GUI.Controls
             ResetTimer();
         }
 
+        // LÓGICA DO CONTADOR (x2, x3...)
         public void IncrementCounter()
         {
             _count++;
             TxtCount.Text = $"x{_count}";
             BadgeCounter.Visibility = Visibility.Visible;
 
-            ResetTimer(); // Mantém a notificação viva
+            // Reinicia o timer para a notificação ficar mais tempo na tela
+            ResetTimer();
 
-            // --- PROTEÇÃO CONTRA AUTO CLICKER (UI FREEZE) ---
-            // Só executa a animação visual se passou 100ms desde a última vez.
-            // Se clicar 50x em 1 seg, vai animar umas 10x só, mas contar todas.
+            // --- PROTEÇÃO CONTRA AUTO CLICKER / SPAM ---
             long currentTick = DateTime.Now.Ticks;
             if (currentTick - _lastAnimationTick > 1000000) // 100ms em Ticks
             {
                 _lastAnimationTick = currentTick;
 
-                // Animação leve de "Pop"
+                // Animação leve de "Pop" no contador
                 var scaleTrans = new ScaleTransform(1, 1);
                 BadgeCounter.RenderTransform = scaleTrans;
+
+                // CORREÇÃO AQUI: Usando System.Windows.Point explicitamente
+                BadgeCounter.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
 
                 var anim = new DoubleAnimation(1.3, 1.0, TimeSpan.FromMilliseconds(150));
                 scaleTrans.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
@@ -92,7 +97,7 @@ namespace KitLugia.GUI.Controls
         protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
         {
             base.OnMouseLeftButtonDown(e);
-            Dismiss();
+            Dismiss(); // Clique fecha instantaneamente
         }
 
         public void Dismiss()
@@ -101,7 +106,7 @@ namespace KitLugia.GUI.Controls
             _isDismissing = true;
             _lifeTimer.Stop();
 
-            this.IsHitTestVisible = false; // Mouse passa através
+            this.IsHitTestVisible = false; // Mouse passa através enquanto some
 
             if (Resources["SlideOutAnimation"] is Storyboard sb)
             {

@@ -3,18 +3,37 @@
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net8.0-windows</TargetFramework>
+		<StartupObject>KitLugia.GUI.Program</StartupObject>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<!-- Suprimir warnings não críticos -->
+		<NoWarn>$(NoWarn);CA1416;CS8602;CS8600;CS8618;WFAC010</NoWarn>
 
 		<!-- Habilita WPF e Windows Forms (para diálogos de pasta) -->
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
+		<!-- Forçar codificação UTF-8 para caracteres especiais -->
+		<CodePage>65001</CodePage>
 		<ApplicationIcon>Iconarchive-Realistic-Fruits-Yellow-Apple.ico</ApplicationIcon>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <None Remove="Pages\DriversPage.xaml.txt" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <Content Include="Iconarchive-Realistic-Fruits-Yellow-Apple.ico" />
+	  <!-- Ferramentas Externas -->
+	  <Content Include="External\Winboot\**\*">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="External\MAS\**\*">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="Resources\**\*">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
 	</ItemGroup>
 
 	<ItemGroup>

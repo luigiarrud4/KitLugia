@@ -7,7 +7,7 @@
       Title="ToolsPage" d:DesignHeight="700" d:DesignWidth="900">
 
     <Page.Resources>
-        <!-- Estilos (Mantidos iguais, apenas código de layout alterado abaixo) -->
+        <!-- Estilos (Mantidos) -->
         <Style TargetType="Button" x:Key="GoldButtonStyle">
             <Setter Property="Background" Value="{StaticResource AccentColor}"/>
             <Setter Property="Foreground" Value="Black"/>
@@ -108,9 +108,9 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="ComboBoxItem">
                                     <Border x:Name="bdr" Background="{TemplateBinding Background}" 
-                                            Padding="5,0" 
-                                            BorderThickness="0,0,0,1" 
-                                            BorderBrush="#2A2A2A">
+                                        Padding="5,0" 
+                                        BorderThickness="0,0,0,1" 
+                                        BorderBrush="#2A2A2A">
                                         <ContentPresenter VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
@@ -154,7 +154,9 @@
             <TextBlock Text="Ferramentas e Utilitários" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
             <TextBlock Text="Funções avançadas para reparo e configuração do sistema." Foreground="#A0A0A0" Margin="0,0,0,20"/>
 
-            <TabControl Background="Transparent" BorderThickness="0">
+            <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
+
+                <!-- ABA 1: ENERGIA -->
                 <TabItem Header="Energia">
                     <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
                         <StackPanel Width="600" HorizontalAlignment="Left">
@@ -168,21 +170,18 @@
                             <ComboBox x:Name="CmbPowerPlans" Margin="0,0,0,10" Style="{StaticResource GoldComboBoxStyle}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
-                                        <!-- GRID SIMPLIFICADO: 2 COLUNAS -->
                                         <Grid Height="40">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="90"/>
-                                                <!-- Espaço fixo para Botão OU Selo -->
                                             </Grid.ColumnDefinitions>
 
                                             <TextBlock Text="{Binding Name}" Grid.Column="0" VerticalAlignment="Center" FontSize="14" 
-                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
-                                                       Padding="0,0,10,0"/>
+                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                                   Padding="0,0,10,0"/>
 
-                                            <!-- 1. SELO ATIVO (OCUPA COLUNA 1) -->
                                             <Border Grid.Column="1" Background="#204CAF50" CornerRadius="4" 
-                                                    VerticalAlignment="Stretch" Margin="0,5">
+                                                VerticalAlignment="Stretch" Margin="0,5">
                                                 <Border.Style>
                                                     <Style TargetType="Border">
                                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -194,19 +193,17 @@
                                                     </Style>
                                                 </Border.Style>
                                                 <TextBlock Text="ATIVO" FontWeight="Bold" Foreground="#4CAF50" FontSize="11" 
-                                                           VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                       VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                             </Border>
 
-                                            <!-- 2. BOTÃO EXCLUIR (OCUPA COLUNA 1) -->
-                                            <!-- Eles nunca aparecem juntos, então um substitui o outro perfeitamente -->
                                             <Button Grid.Column="1" 
-                                                    Click="BtnDeleteItem_Click" 
-                                                    Tag="{Binding}"
-                                                    HorizontalAlignment="Stretch"
-                                                    VerticalAlignment="Stretch"
-                                                    Cursor="Hand"
-                                                    Margin="0,4"
-                                                    Focusable="False">
+                                                Click="BtnDeleteItem_Click" 
+                                                Tag="{Binding}"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"
+                                                Cursor="Hand"
+                                                Margin="0,4"
+                                                Focusable="False">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
                                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -218,8 +215,8 @@
                                                             <Setter.Value>
                                                                 <ControlTemplate TargetType="Button">
                                                                     <Border x:Name="bdr" Background="{TemplateBinding Background}" 
-                                                                            BorderBrush="{TemplateBinding BorderBrush}" 
-                                                                            BorderThickness="1" CornerRadius="4">
+                                                                        BorderBrush="{TemplateBinding BorderBrush}" 
+                                                                        BorderThickness="1" CornerRadius="4">
                                                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                                     </Border>
                                                                     <ControlTemplate.Triggers>
@@ -262,6 +259,7 @@
                     </Border>
                 </TabItem>
 
+                <!-- ABA 2: REDE -->
                 <TabItem Header="Rede (DNS)">
                     <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
                         <StackPanel Width="500" HorizontalAlignment="Left">
@@ -283,6 +281,7 @@
                     </Border>
                 </TabItem>
 
+                <!-- ABA 3: SISTEMA -->
                 <TabItem Header="Sistema &amp; Loja">
                     <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
                         <StackPanel Width="500" HorizontalAlignment="Left">
@@ -297,6 +296,79 @@
                         </StackPanel>
                     </Border>
                 </TabItem>
+
+                <!-- ABA 4: EXPLORER & MENU (NOVA!) -->
+                <TabItem Header="Explorer &amp; Menu">
+                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                        <StackPanel Width="600" HorizontalAlignment="Left">
+                            <TextBlock Text="Menu de Contexto (Botão Direito)" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Adicionar 'Obter Controle Total' (Take Ownership)" Foreground="White"/>
+                                    <TextBlock Text="Essencial para deletar arquivos de sistema bloqueados." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Adicionar / Remover" Click="BtnToggleOwnership_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Adicionar 'Abrir Prompt de Comando Aqui'" Foreground="White"/>
+                                    <TextBlock Text="Abre o CMD como Admin na pasta atual." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Adicionar / Remover" Click="BtnToggleCmd_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Separator Background="{StaticResource CardBorder}" Margin="0,20"/>
+
+                            <TextBlock Text="Visualização de Arquivos" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Mostrar/Ocultar Arquivos Ocultos" Foreground="White"/>
+                                    <TextBlock Text="Alterna a visualização de arquivos de sistema." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Alternar" Click="BtnToggleHidden_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Mostrar/Ocultar Extensões (.exe, .txt)" Foreground="White"/>
+                                    <TextBlock Text="Segurança: sempre veja a extensão real do arquivo." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Alternar" Click="BtnToggleExtensions_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Separator Background="{StaticResource CardBorder}" Margin="0,20"/>
+                            <TextBlock Text="Impressão" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                            <Button Content="🖨️ Limpar Fila de Impressão (Spooler)" Click="BtnClearSpooler_Click" Style="{StaticResource GoldButtonStyle}" 
+                                    ToolTip="Remove documentos travados na fila de impressão."/>
+
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
             </TabControl>
         </StackPanel>
     </ScrollViewer>

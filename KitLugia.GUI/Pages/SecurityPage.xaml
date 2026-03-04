@@ -1,0 +1,80 @@
+<Page x:Class="KitLugia.GUI.Pages.SecurityPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Segurança e Privacidade">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30" MaxWidth="950">
+            <TextBlock Text="Segurança e Privacidade" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10"/>
+            <TextBlock Text="Configurações de segurança e privacidade do sistema." Foreground="{StaticResource TextSecondary}" Margin="0,0,0,30"/>
+
+            <!-- Card de Segurança -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="25" Margin="0,0,0,25">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="🔐" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Segurança do Sistema" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <TextBlock Text="Proteção ativa e configurações de firewall." Foreground="{StaticResource TextMuted}" Margin="0,0,0,20"/>
+                    
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="Windows Defender (Antivírus)" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="True" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="Firewall do Windows" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="True" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="Filtro SmartScreen" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="False" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right"/>
+                    </Grid>
+                    
+                    <Grid>
+                        <TextBlock Text="Atualizações Automáticas (Windows Update)" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="True" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Card de Privacidade -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="25">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="🛡️" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Privacidade e Telemetria" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Controle quais dados o Windows envia para a Microsoft." Foreground="{StaticResource TextMuted}" Margin="0,0,0,20"/>
+                    
+                    <Grid Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Telemetria (Dados de Diagnóstico)" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Recomendado: Desativado para performance." FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                        <!-- Lógica visual: Se marcado, está desativando a telemetria (protegendo) -->
+                        <CheckBox x:Name="CheckTelemetry" IsChecked="True" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ToggleTelemetry_Click"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="Histórico de Atividades" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="False" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="Serviços de Localização" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="False" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right"/>
+                    </Grid>
+
+                    <Grid>
+                        <TextBlock Text="ID de Publicidade (Rastreamento)" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="False" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

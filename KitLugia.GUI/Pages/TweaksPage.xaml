@@ -53,6 +53,26 @@
 
                         <CheckBox x:Name="ChkMPO" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMPO_Click"/>
                     </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 3: Timer & Latency -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Otimizar Timer &amp; Latência (HPET)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Ajusta PlatformClock, Tick Dinâmico e Resolução do Timer (1ms)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusTimer" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkTimer" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTimer_Click"/>
+                    </Grid>
                 </StackPanel>
             </Border>
 
@@ -97,6 +117,131 @@
                         <TextBlock x:Name="StatusBing" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
                         <CheckBox x:Name="ChkBing" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBing_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 5: MemoryUsage -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Otimizar Uso de Memória (Fsutil)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Equivalente a 'fsutil behavior set memoryusage 2'. Otimiza gerenciamento de memória." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusMemoryUsage" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkMemoryUsage" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMemoryUsage_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 6: Fast Shutdown -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desligamento Turbo (Shutdownturbo)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Reduz o tempo de espera para fechar apps ao desligar (2s)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusShutdown" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkShutdown" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkShutdown_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- SLIDE ENGINE (BOTTOM) -->
+            <TextBlock Text="Performance Extrema (SLIDE)" FontSize="16" FontWeight="Bold" Foreground="#FFAA00" Margin="0,30,0,15"/>
+            <Border Background="#1A1500" BorderBrush="#805500" BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+                    
+                    <!-- Aviso de Segurança -->
+                    <Border Background="#332000" BorderBrush="#995500" BorderThickness="1" CornerRadius="4" Padding="15" Margin="20,20,20,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚠️ CUIDADO:" FontWeight="Bold" Foreground="#FFAA00" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Estas opções injetam mudanças extremas nos drivers primários do sistema." Foreground="#DDDDDD" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Item 1: SLIDE Input -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Overdrive de Mouse &amp; Teclado" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Remove recuos de polling. Define Kbdclass/Mouclass para prioridade máxima no Kernel." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusSlideInput" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSlideInput" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSlideInput_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- Item 2: SLIDE USB -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Extermínio de Power Saving USB" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Varre toda a árvore de periféricos e previne micro-suspensões (Selective Suspend)." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusSlideUsb" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSlideUsb" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSlideUsb_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- Item 3: SLIDE Gaming -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Latência Extrema de Rede &amp; GPU" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Desativa GameDVR nativo e arranca visualizadores DWM. Extingue Nagle's Algorithm via rede." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusSlideGaming" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSlideGaming" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSlideGaming_Click"/>
                     </Grid>
                 </StackPanel>
             </Border>

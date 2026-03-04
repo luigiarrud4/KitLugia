@@ -7,7 +7,7 @@ namespace KitLugia.GUI.Controls
     public partial class LugiaMsgBox : UserControl
     {
         // Evento que avisa a janela principal que o botão foi clicado
-        public event RoutedEventHandler OkClicked;
+        public event RoutedEventHandler? OkClicked;
 
         public LugiaMsgBox()
         {

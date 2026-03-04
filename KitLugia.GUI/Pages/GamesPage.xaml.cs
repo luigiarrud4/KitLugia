@@ -15,7 +15,7 @@ namespace KitLugia.GUI.Pages
             LoadStats();
         }
 
-        private async void LoadStats()
+        private async Task LoadStats()
         {
             double totalRam = SystemUtils.GetTotalSystemRamGB();
             TxtTotalRam.Text = $"{totalRam:F1} GB";

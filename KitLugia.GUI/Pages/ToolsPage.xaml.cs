@@ -3,13 +3,16 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
+using MessageBox = System.Windows.MessageBox;
 using System.Windows.Controls;
 using KitLugia.Core;
-using System.Windows.Forms;
+using WinForms = System.Windows.Forms; // Para FolderBrowserDialog
 using Application = System.Windows.Application;
 
 namespace KitLugia.GUI.Pages
 {
+    // Classe auxiliar para a lista de planos de energia
     public class PowerPlanItem : INotifyPropertyChanged
     {
         public string Name { get; set; } = "";
@@ -31,15 +34,27 @@ namespace KitLugia.GUI.Pages
     public partial class ToolsPage : Page
     {
         private readonly HashSet<string> _defaultGuids = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
-            { "381b4222-f694-41f0-9685-ff5bb260df2e", "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", "a1841308-3541-4fab-bc81-f71556f20b4a", "e9a42b02-d5df-448d-aa00-03f14749eb61" };
+        { "381b4222-f694-41f0-9685-ff5bb260df2e", "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", "a1841308-3541-4fab-bc81-f71556f20b4a", "e9a42b02-d5df-448d-aa00-03f14749eb61" };
 
-        public ToolsPage()
+        private int _initialTabIndex = 0;
+
+        public ToolsPage(int tabIndex = 0)
         {
             InitializeComponent();
+            _initialTabIndex = tabIndex;
             Loaded += ToolsPage_Loaded;
         }
 
-        private void ToolsPage_Loaded(object sender, RoutedEventArgs e) => RefreshPowerPlans();
+        private void ToolsPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (MainTabs != null) MainTabs.SelectedIndex = _initialTabIndex;
+            RefreshPowerPlans();
+        }
+
+        // =========================================================
+        // ABA 1: ENERGIA
+        // =========================================================
+        #region Power Logic
 
         private void RefreshPowerPlans()
         {
@@ -94,20 +109,16 @@ namespace KitLugia.GUI.Pages
                 }
                 else
                 {
+                    // Reseta outros botões de delete
                     if (CmbPowerPlans.ItemsSource is IEnumerable<PowerPlanItem> items)
                     {
                         foreach (var item in items) item.IsConfirmingDelete = false;
                     }
 
                     planToDelete.IsConfirmingDelete = true;
-
-                    // TIMER REDUZIDO PARA 1.5 SEGUNDOS
                     await Task.Delay(1500);
-
-                    if (planToDelete.IsConfirmingDelete)
-                    {
-                        planToDelete.IsConfirmingDelete = false;
-                    }
+                    // Se ainda estiver na tela, reseta
+                    if (planToDelete != null) planToDelete.IsConfirmingDelete = false;
                 }
             }
         }
@@ -133,8 +144,14 @@ namespace KitLugia.GUI.Pages
                 RefreshPowerPlans();
             }
         }
+        #endregion
 
-        private async void ApplyDns(string provider)
+        // =========================================================
+        // ABA 2: REDE
+        // =========================================================
+        #region Network Logic
+
+        private async Task ApplyDns(string provider)
         {
             if (Application.Current.MainWindow is MainWindow mw)
             {
@@ -145,9 +162,9 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void BtnDnsCloudflare_Click(object sender, RoutedEventArgs e) => ApplyDns("Cloudflare");
-        private void BtnDnsGoogle_Click(object sender, RoutedEventArgs e) => ApplyDns("Google");
-        private void BtnDnsDhcp_Click(object sender, RoutedEventArgs e) => ApplyDns("DHCP");
+        private async void BtnDnsCloudflare_Click(object sender, RoutedEventArgs e) => await ApplyDns("Cloudflare");
+        private async void BtnDnsGoogle_Click(object sender, RoutedEventArgs e) => await ApplyDns("Google");
+        private async void BtnDnsDhcp_Click(object sender, RoutedEventArgs e) => await ApplyDns("DHCP");
 
         private async void BtnFlushDns_Click(object sender, RoutedEventArgs e)
         {
@@ -169,6 +186,12 @@ namespace KitLugia.GUI.Pages
                 }
             }
         }
+        #endregion
+
+        // =========================================================
+        // ABA 3: SISTEMA & LOJA
+        // =========================================================
+        #region System Logic
 
         private void BtnStoreReset_Click(object sender, RoutedEventArgs e)
         {
@@ -191,7 +214,7 @@ namespace KitLugia.GUI.Pages
         private async void BtnGpedit_Click(object sender, RoutedEventArgs e)
         {
             if (Application.Current.MainWindow is MainWindow mw)
-                mw.ShowInfo("GPEDIT", "O processo de instalação será iniciado em uma janela separada e pode levar alguns minutos.");
+                mw.ShowInfo("GPEDIT", "A instalação será iniciada em nova janela.");
 
             await Task.Run(() => Toolbox.EnableGroupPolicyEditor());
         }
@@ -207,18 +230,67 @@ namespace KitLugia.GUI.Pages
 
         private void BtnDriverBackup_Click(object sender, RoutedEventArgs e)
         {
-            using (var dialog = new FolderBrowserDialog())
+            using (var dialog = new WinForms.FolderBrowserDialog())
             {
                 dialog.Description = "Selecione onde salvar o backup dos drivers";
-                if (dialog.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                if (dialog.ShowDialog() == WinForms.DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
                 {
                     if (Application.Current.MainWindow is MainWindow mw)
                     {
-                        var backupResult = Toolbox.BackupThirdPartyDrivers(dialog.SelectedPath);
-                        mw.ShowSuccess("BACKUP DE DRIVERS", backupResult.Message);
+                        var backupResult = DriverManager.BackupDrivers(dialog.SelectedPath);
+                        if (backupResult.Success) mw.ShowSuccess("BACKUP DE DRIVERS", backupResult.Message);
+                        else mw.ShowError("ERRO NO BACKUP", backupResult.Message);
                     }
                 }
             }
         }
+        #endregion
+
+        // =========================================================
+        // ABA 4: EXPLORER & MENU (NOVA)
+        // =========================================================
+        #region Explorer Logic
+
+        private void HandleTweakResult((bool Success, string Message) result)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+            {
+                if (result.Success) mw.ShowSuccess("SUCESSO", result.Message);
+                else mw.ShowError("ERRO", result.Message);
+            }
+        }
+
+        private void BtnToggleOwnership_Click(object sender, RoutedEventArgs e)
+        {
+            HandleTweakResult(Toolbox.ToggleTakeOwnershipContext());
+        }
+
+        private void BtnToggleCmd_Click(object sender, RoutedEventArgs e)
+        {
+            HandleTweakResult(Toolbox.ToggleCmdContext());
+        }
+
+        private void BtnToggleHidden_Click(object sender, RoutedEventArgs e)
+        {
+            HandleTweakResult(Toolbox.ToggleHiddenFiles());
+        }
+
+        private void BtnToggleExtensions_Click(object sender, RoutedEventArgs e)
+        {
+            HandleTweakResult(Toolbox.ToggleFileExtensions());
+        }
+
+        private async void BtnClearSpooler_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+            {
+                mw.ShowInfo("AGUARDE", "Reiniciando serviços de impressão...");
+                var result = await Task.Run(() => Toolbox.ClearPrintSpooler());
+
+                if (result.Success) mw.ShowSuccess("IMPRESSÃO", result.Message);
+                else mw.ShowError("ERRO", result.Message);
+            }
+        }
+        #endregion
     }
 }

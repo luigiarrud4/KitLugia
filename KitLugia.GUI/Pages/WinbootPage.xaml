@@ -1,0 +1,310 @@
+<Page x:Class="KitLugia.GUI.Pages.WinbootPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      d:DesignHeight="700" d:DesignWidth="1000"
+      Title="Winboot">
+
+    <Page.Resources>
+    </Page.Resources>
+
+    <Grid Margin="30">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
+            <TextBlock Text="🚀" FontSize="32" Margin="0,0,15,0" VerticalAlignment="Center"/>
+            <StackPanel>
+                <TextBlock Text="WINBOOT (NO-USB)" FontSize="26" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
+                <TextBlock Text="Instalação Local Independente de Mídia" FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
+            </StackPanel>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+            <StackPanel>
+                <!-- Disk Selection Card -->
+                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="💾 DISCO E PARTIÇÃO" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
+
+                        <TextBlock Text="Selecione o disco físico:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                        <Grid Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- COMBOBOX DISCOS CORRIGIDO -->
+                            <ComboBox x:Name="ComboDisks" Height="40" 
+                                      Style="{StaticResource DarkComboBoxStyle}"
+                                      SelectionChanged="ComboDisks_SelectionChanged">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}" Foreground="White" Padding="5"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <Button Grid.Column="1" Content="🔄" Width="45" Margin="10,0,0,0" Click="BtnRefresh_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                        </Grid>
+
+                        <TextBlock Text="Selecione a partição para reduzir (serão retirados 8GB):" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+
+                        <!-- COMBOBOX PARTIÇÕES CORRIGIDO -->
+                        <ComboBox x:Name="ComboPartitions" Height="40" 
+                                  Style="{StaticResource DarkComboBoxStyle}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}" Foreground="White" Padding="5"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <TextBlock Text="⚠️ Nota: Partições menores que 8GB ou reservadas pelo sistema estão ocultas." 
+                                   FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,10,0,0"/>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- ISO Selection Card -->
+                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="💿 IMAGEM ISO" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
+                        <TextBlock Text="Selecione o arquivo ISO de instalação:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtIsoPath" Height="40" VerticalContentAlignment="Center" 
+                                     Background="#1A1A1A" Foreground="#FFFFFF" BorderThickness="1" BorderBrush="#444444" Padding="15,0" IsReadOnly="True"
+                                     TextChanged="TxtIsoPath_TextChanged"/>
+                            <Button Grid.Column="1" Content="BUSCAR ISO" Padding="20,0" Margin="10,0,0,0" Click="BtnBrowseIso_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                        </Grid>
+                        <TextBlock x:Name="TxtDetectedIsoType" Text="" FontSize="11" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Help Section moved inside Main View -->
+                <Border Background="#0AFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="❔ COMO FUNCIONA O WINBOOT" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                        <TextBlock Text="1. Seleção: Escolha o disco e a imagem ISO." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="2. Identificação: O sistema analisará a ISO automaticamente." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="3. Customização: Você escolherá as opções compatíveis." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="4. Criação: A partição 'KITLUGIA' será preparada e o boot configurado." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                    </StackPanel>
+                </Border>
+
+
+
+                <!-- Diagnostics & Post-Install Info -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                </Grid>
+
+                <!-- Expandable Detailed Log -->
+                <Expander Header="LOG DETALHADO (DIAGNÓSTICO E EXECUÇÃO)" Background="Transparent" Foreground="{StaticResource TextMuted}" Margin="0,0,0,20">
+                    <Border Background="#05000000" CornerRadius="8" Padding="10" Margin="0,5,0,0" BorderBrush="#11FFFFFF" BorderThickness="1">
+                        <TextBox x:Name="TxtLogViewer" Height="150" Background="Transparent" Foreground="#88FFFFFF" 
+                                 BorderThickness="0" FontFamily="Consolas" TextWrapping="Wrap" IsReadOnly="True"
+                                 VerticalScrollBarVisibility="Auto"/>
+                    </Border>
+                </Expander>
+
+                <!-- Status Monitor -->
+                <Border Background="#11D4AF37" BorderBrush="#33D4AF37" BorderThickness="1" CornerRadius="5" Padding="15" Margin="0,0,0,15">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Status:" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,10,0"/>
+                        <TextBlock x:Name="TxtStatus" Text="Aguardando início..." Foreground="White"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer Actions -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" Margin="-30,20,-30,-30" Padding="30">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Atenção: Este processo modificará partições do sistema." FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                    <TextBlock Text="Certifique-se de que possui backup dos seus dados críticos." FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button x:Name="BtnRemove" Content="🗑️ REMOVER BOOT" Background="#442222" Foreground="#FF8888" Margin="0,0,15,0" Width="130" Click="BtnRemove_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="BtnUpdate" Content="🔄 ATUALIZAR" Width="130" Margin="0,0,15,0" Click="BtnUpdate_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="BtnCreate" Content="🚀 INICIAR CRIAÇÃO" Width="180" FontSize="14" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Configuration Overlay -->
+        <Border x:Name="OverlayConfig" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-30">
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="2" CornerRadius="15" 
+                    Width="650" MaxHeight="650" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Margin="0,0,0,20">
+                        <TextBlock x:Name="TxtConfigTitle" Text="⚙️ CONFIGURAR INSTALAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="TxtConfigIsoInfo" Text="Identificando ISO..." Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" Margin="0,0,0,20" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="PanelCustomizations">
+                            <!-- Options for Windows -->
+                            <StackPanel x:Name="PanelWindowsOptions">
+                                <StackPanel x:Name="PanelGeneratorCheckboxes">
+                                    <TextBlock Text="RUFUS-STYLE AUTOMATION" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                    <CheckBox x:Name="ChkBypassTpm" Content="Ignorar requisitos do Windows 11 (TPM 2.0, Secure Boot, RAM)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
+                                    <CheckBox x:Name="ChkLocalAccount" Content="Remover exigência de Conta Microsoft (Forçar conta local)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
+                                    <CheckBox x:Name="ChkDisablePrivacy" Content="Desabilitar Telemetria e Privacidade" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
+                                    <CheckBox x:Name="ChkFullAuto" Content="Instalação Totalmente Autônoma" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8" IsChecked="True"/>
+                                    <CheckBox x:Name="ChkExportDrivers" Content="Exportar Drivers do Host (Evita Tela Azul)" Foreground="White" Margin="0,0,0,15" IsChecked="False"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="PanelUserAccount">
+                                    <TextBlock Text="CONTA DE USUÁRIO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,5,0">
+                                            <TextBlock Text="Nome:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                            <TextBox x:Name="TxtUserName" Text="Usuario" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                            <TextBlock Text="Senha:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                            <PasswordBox x:Name="TxtPassword" Style="{StaticResource DarkPasswordBoxStyle}" Height="30"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+
+                                <TextBlock Text="PÓS-INSTALAÇÃO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkInjectKit" Content="Injetar KitLugia (Instalação Automática)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
+                                <CheckBox x:Name="ChkAutoCleanup" Content="Limpeza Automática após instalação" Foreground="White" Margin="0,0,0,15" IsChecked="True"/>
+
+                                <TextBlock Text="PERFIL DE AUTOMAÇÃO (CONFIGURAÇÃO CUSTOMIZADA)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                <ComboBox x:Name="ComboAutomationProfiles" Height="40" Margin="0,0,0,5"
+                                          Style="{StaticResource DarkComboBoxStyle}"
+                                          SelectionChanged="ComboAutomationProfiles_SelectionChanged">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <TextBlock x:Name="TxtFriendlyName" Text="{Binding FriendlyName}" FontWeight="Bold" Foreground="White" Padding="5,5,5,0"/>
+                                                <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{StaticResource TextMuted}" Padding="5,0,5,5"/>
+                                            </StackPanel>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsRecommended}" Value="True">
+                                                    <Setter TargetName="TxtFriendlyName" Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock x:Name="TxtProfileWarning" Text="" FontSize="10" Foreground="#FF5555" Margin="0,0,0,15" Visibility="Collapsed"/>
+
+                                <Grid Margin="0,0,0,20">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="TxtCustomXmlInfo" Text="Usando gerador interno" Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="IMPORTAR XML" Padding="10,3" Click="BtnImportXml_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- File Injection -->
+                            <StackPanel x:Name="PanelFileInjection" Margin="0,0,0,15">
+                                <TextBlock Text="INJEÇÃO DE ARQUIVOS (ADAPTATIVO)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                <TextBlock Text="Selecione uma pasta para copiar automaticamente para a Área de Trabalho após a formatação. O tamanho da partição será ajustado automaticamente." FontSize="10" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtInjectedPath" IsReadOnly="True" Style="{StaticResource DarkTextBoxStyle}" Height="30" VerticalContentAlignment="Center" Text="Nenhuma pasta selecionada (Opcional)" Foreground="Gray"/>
+                                    <Button Grid.Column="1" Content="..." Width="40" Height="30" Margin="5,0,0,0" Click="BtnBrowseInjected_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Generic Options -->
+                            <TextBlock Text="SISTEMA DE ARQUIVOS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <CheckBox x:Name="ChkMultiIso" Content="Modo Multi-ISO / FAT32 (Obrigatório para Strelec/Linux)" Foreground="White" Margin="0,0,0,15" IsChecked="False"/>
+                            
+                            <Border Background="#11FFFFFF" Padding="15" CornerRadius="8">
+                                <TextBlock Text="A partição Winboot será protegida contra deleção acidental na tela de seleção do disco do Windows." 
+                                           FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="CANCELAR" Width="120" Margin="0,0,15,0" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Button x:Name="BtnConfirmStart" Content="🚀 INICIAR AGORA" Width="180" Click="BtnConfirmStart_Click" Style="{StaticResource GoldButtonStyle}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border x:Name="OverlayBusy" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-30">
+            <StackPanel VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="250" Height="4" Foreground="{StaticResource AccentColor}" Background="#111111" BorderThickness="0" Margin="0,0,0,15"/>
+                <TextBlock x:Name="TxtBusyStatus" Text="Processando..." Foreground="White" HorizontalAlignment="Center" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="Operação crítica. Não feche o KitLugia." Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Removal Selection Overlay -->
+        <Border x:Name="OverlayRemoval" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-30">
+            <Border Background="{StaticResource CardBackground}" BorderBrush="#552222" BorderThickness="2" CornerRadius="12" 
+                    Width="500" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
+                <StackPanel>
+                    <TextBlock Text="🗑️ SELEÇÃO DE REMOÇÃO" FontSize="20" FontWeight="Bold" Foreground="#FF5555" Margin="0,0,0,15" HorizontalAlignment="Center"/>
+                    
+                    <TextBlock Text="Múltiplas partições Winboot detectadas." Foreground="#CCCCCC" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Selecione qual partição você deseja remover:" Foreground="#CCCCCC" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+                    <ComboBox x:Name="ComboRemovalCandidates" Height="40" Margin="0,0,0,20" Style="{StaticResource DarkComboBoxStyle}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" Foreground="White" Padding="5"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <TextBlock Text="A partição selecionada será deletada e seu espaço será devolvido ao disco." 
+                               FontSize="11" Foreground="#888888" TextWrapping="Wrap" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="CANCELAR" Width="120" Margin="0,0,15,0" Click="BtnCancelRemoval_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Button Content="CONFIRMAR EXCLUSÃO" Width="180" Background="#992222" Foreground="White" Click="BtnConfirmRemoval_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+    </Grid>
+</Page>

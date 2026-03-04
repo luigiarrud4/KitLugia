@@ -1,0 +1,645 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using KitLugia.Core;
+using Microsoft.Win32;
+
+namespace KitLugia.GUI.Pages
+{
+    public partial class WinbootPage : Page
+    {
+        private List<DiskInfo> _disks = new List<DiskInfo>();
+        private bool _isBusy = false;
+        private bool _isUpgrade = false;
+        private string? _customXmlPath = null;
+        private string? _injectedPath = null;
+        private bool _isLinux = false;
+
+        public WinbootPage()
+        {
+            InitializeComponent();
+            WinbootManager.OnLogUpdate += (msg) => Dispatcher.Invoke(() => AppendLog(msg));
+            RefreshDisks();
+            LoadAutomationProfiles();
+        }
+
+        private void LoadAutomationProfiles()
+        {
+            try
+            {
+                var profiles = WinbootManager.GetAutomationProfiles();
+                ComboAutomationProfiles.ItemsSource = profiles;
+                
+                // Auto-selecionar o recomendado se existir
+                int recommendedIndex = profiles.FindIndex(p => p.IsRecommended);
+                ComboAutomationProfiles.SelectedIndex = recommendedIndex >= 0 ? recommendedIndex : 0;
+            }
+            catch { }
+        }
+
+        private void ComboAutomationProfiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ComboAutomationProfiles.SelectedItem is WinbootManager.AutomationProfile profile)
+            {
+                if (profile.FileName == null)
+                {
+                    // Gerador Interno: Mostra tudo
+                    TxtProfileWarning.Visibility = Visibility.Collapsed;
+                    _customXmlPath = null;
+                    PanelGeneratorCheckboxes.Visibility = Visibility.Visible;
+                    TxtCustomXmlInfo.Text = "Usando gerador interno";
+                    TxtCustomXmlInfo.Foreground = (System.Windows.Media.SolidColorBrush)FindResource("TextMuted");
+                }
+                else
+                {
+                    // Perfil E2B: Esconde gerador interno, mas mantém Conta de Usuário
+                    _customXmlPath = profile.FullPath;
+                    PanelGeneratorCheckboxes.Visibility = Visibility.Collapsed;
+                    TxtCustomXmlInfo.Text = "PERFIL E2B: " + profile.FriendlyName;
+                    TxtCustomXmlInfo.Foreground = (System.Windows.Media.SolidColorBrush)FindResource("AccentColor");
+
+                    if (profile.IsDanger)
+                    {
+                        TxtProfileWarning.Text = "⚠️ ATENÇÃO: Este perfil apaga o disco automaticamente (WIPE). Use com cautela extrema!";
+                        TxtProfileWarning.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        TxtProfileWarning.Visibility = Visibility.Collapsed;
+                    }
+                }
+            }
+        }
+
+        private void BtnImportXml_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "XML Unattend (*.xml)|*.xml" };
+            if (dlg.ShowDialog() == true)
+            {
+                _customXmlPath = dlg.FileName;
+                TxtCustomXmlInfo.Text = "IMPORTADO: " + Path.GetFileName(_customXmlPath);
+                TxtCustomXmlInfo.Foreground = (System.Windows.Media.SolidColorBrush)FindResource("AccentColor");
+                WinbootManager.Log($"XML Customizado importado: {_customXmlPath}");
+            }
+        }
+
+
+        private void AppendLog(string msg)
+        {
+            TxtLogViewer.AppendText(msg + Environment.NewLine);
+            TxtLogViewer.ScrollToEnd();
+        }
+
+        private void RefreshDisks()
+        {
+            WinbootManager.Log("Atualizando lista de discos...");
+            _disks = WinbootManager.GetDisks(true);
+            ComboDisks.ItemsSource = _disks;
+            if (_disks.Count > 0)
+            {
+                ComboDisks.SelectedIndex = 0;
+                
+                // Auto-selecionar partição C: (ou a maior com letra de unidade)
+                var disk = _disks[0];
+                var cPart = disk.Partitions.OrderByDescending(p => p.DriveLetter.Equals("C:", StringComparison.OrdinalIgnoreCase))
+                                          .ThenByDescending(p => p.Size)
+                                          .FirstOrDefault(p => !string.IsNullOrEmpty(p.DriveLetter) && p.Size >= 15000000000);
+                
+                if (cPart != null)
+                {
+                    ComboPartitions.SelectedItem = cPart;
+                    WinbootManager.Log($"Auto-seleção Sniper: Partição {cPart.DriveLetter} ({cPart.Label}) escolhida como alvo.");
+                }
+            }
+            TxtStatus.Text = "Discos atualizados.";
+        }
+
+        private void BtnRefresh_Click(object sender, RoutedEventArgs e) => RefreshDisks();
+
+        private void ComboDisks_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ComboDisks.SelectedItem is DiskInfo disk)
+            {
+                WinbootManager.Log($"Disco selecionado: {disk.Index} ({disk.Model})");
+                // FILTRO DE SEGURANÇA: Somente partições >= 8GB e que não sejam reservadas/sistema
+                var safePartitions = disk.Partitions.Where(p => p.IsSafeToUse).ToList();
+                ComboPartitions.ItemsSource = safePartitions;
+                
+                if (safePartitions.Count > 0)
+                {
+                    ComboPartitions.SelectedIndex = 0;
+                    TxtStatus.Text = $"{safePartitions.Count} partições seguras encontradas no Disco {disk.Index}.";
+                }
+                else
+                {
+                    TxtStatus.Text = "Nenhuma partição adequada encontrada neste disco (Requer > 8GB).";
+                }
+            }
+        }
+
+        private void BtnBrowseIso_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Arquivos ISO (*.iso)|*.iso" };
+            if (dlg.ShowDialog() == true)
+            {
+                TxtIsoPath.Text = dlg.FileName;
+            }
+        }
+
+        private void TxtIsoPath_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(TxtIsoPath.Text)) return;
+            
+            // Limpa tipo detectado anterior
+            TxtDetectedIsoType.Text = "";
+        }
+
+        private void BtnBrowseInjected_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Selecione a pasta para injetar" };
+            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                _injectedPath = dlg.SelectedPath;
+                TxtInjectedPath.Text = _injectedPath;
+                TxtInjectedPath.Foreground = System.Windows.Media.Brushes.White;
+                
+                // Recalcular Tamanho Preview
+                int sizeGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
+                UpdateStatus($"Tamanho estimado da partição: {sizeGb} GB (Base + Injeção)");
+            }
+        }
+
+        private void BtnCancelConfig_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayConfig.Visibility = Visibility.Collapsed;
+        }
+
+        private async void BtnCreate_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(TxtIsoPath.Text))
+            {
+                System.Windows.MessageBox.Show("Selecione uma imagem ISO primeiro.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (ComboPartitions.SelectedItem == null)
+            {
+                System.Windows.MessageBox.Show("Selecione uma partição de origem.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                _isBusy = true;
+                UpdateStatus("Analisando ISO... (Isso pode levar alguns segundos)");
+                OverlayBusy.Visibility = Visibility.Visible;
+
+                var info = await WinbootManager.IdentifyIsoType(TxtIsoPath.Text);
+                
+                OverlayBusy.Visibility = Visibility.Collapsed;
+                _isBusy = false;
+
+                if (info != null)
+                {
+                    TxtConfigIsoInfo.Text = "DETECTADO: " + info.Value.Description;
+                    bool isWin = info.Value.Description.Contains("KitLugia", StringComparison.OrdinalIgnoreCase);
+
+                    if (!string.IsNullOrEmpty(info.Value.SafetyWarning))
+                    {
+                        WinbootManager.Log("AVISO IMPORTANTE: " + info.Value.SafetyWarning);
+                        TxtConfigIsoInfo.Foreground = System.Windows.Media.Brushes.OrangeRed;
+                        TxtConfigIsoInfo.Text += " (Aviso)";
+                    }
+                    else
+                    {
+                        TxtConfigIsoInfo.Foreground = System.Windows.Media.Brushes.LightGreen;
+                    }
+
+                    // Ajustar UI do Overlay
+                    bool isWindows = info.Value.Description.Contains("Windows", StringComparison.OrdinalIgnoreCase) || 
+                                    info.Value.Description.Contains("KitLugia", StringComparison.OrdinalIgnoreCase);
+                    _isLinux = !isWindows;
+
+                    if (!isWindows)
+                    {
+                        PanelWindowsOptions.Visibility = Visibility.Collapsed;
+                        ChkBypassTpm.IsChecked = false;
+                        ChkLocalAccount.IsChecked = false;
+                        ChkDisablePrivacy.IsChecked = false;
+                        ChkFullAuto.IsChecked = false;
+                        ChkInjectKit.IsChecked = false;
+                        ChkAutoCleanup.IsChecked = false;
+                        ChkMultiIso.IsChecked = true;
+                        TxtCustomXmlInfo.Text = "Automação Windows desabilitada.";
+                    }
+                    else
+                    {
+                        PanelWindowsOptions.Visibility = Visibility.Visible;
+                        ChkBypassTpm.IsChecked = true;
+                        ChkLocalAccount.IsChecked = true;
+                        ChkDisablePrivacy.IsChecked = true;
+                        ChkFullAuto.IsChecked = true;
+                        ChkInjectKit.IsChecked = true;
+                        ChkAutoCleanup.IsChecked = true;
+                        ChkMultiIso.IsChecked = false;
+                        
+                        if (_customXmlPath == null)
+                            TxtCustomXmlInfo.Text = "Usando gerador interno";
+                        else
+                            TxtCustomXmlInfo.Text = "Perfil E2B selecionado.";
+                    }
+
+                    OverlayConfig.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    System.Windows.MessageBox.Show("Não foi possível identificar o tipo desta ISO. Ela pode não ser bootável ou está corrompida.", "Erro de Identificação", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                OverlayBusy.Visibility = Visibility.Collapsed;
+                _isBusy = false;
+                System.Windows.MessageBox.Show($"Erro: {ex.Message}");
+            }
+        }
+
+        private async void BtnUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(TxtIsoPath.Text))
+            {
+                ShowError("Selecione uma imagem ISO primeiro.");
+                return;
+            }
+
+            SetBusy(true, "Lendo Edições da ISO...");
+            _isUpgrade = true;
+            
+            try 
+            {
+                var editions = await WinbootManager.GetIsoEditions(TxtIsoPath.Text);
+                SetBusy(false);
+
+                if (editions.Count == 0)
+                {
+                    ShowError("Não foi possível encontrar imagens de instalação nesta ISO.");
+                    return;
+                }
+
+                // Configurar Overlay para Modo Upgrade
+                TxtConfigTitle.Text = "🔄 ATUALIZAÇÃO IN-PLACE";
+                TxtConfigIsoInfo.Text = "Selecione a edição para a qual deseja atualizar (Manter Arquivos).";
+                PanelWindowsOptions.Visibility = Visibility.Collapsed;
+                PanelUserAccount.Visibility = Visibility.Collapsed;
+                PanelFileInjection.Visibility = Visibility.Collapsed;
+                
+                ComboAutomationProfiles.ItemsSource = editions;
+                ComboAutomationProfiles.SelectedIndex = 0;
+                
+                OverlayConfig.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                SetBusy(false);
+                ShowError(ex.Message);
+            }
+        }
+
+        private async void BtnConfirmStart_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isUpgrade)
+            {
+                if (ComboAutomationProfiles.SelectedItem is WinbootManager.WimEditionInfo info)
+                {
+                    OverlayConfig.Visibility = Visibility.Collapsed;
+                    SetBusy(true, "Lançando Atualização...");
+                    bool success = await WinbootManager.StartInPlaceUpgrade(TxtIsoPath.Text, info.Index, info.EditionId);
+                    SetBusy(false);
+                    
+                    if (success)
+                    {
+                        ShowSuccess("LANÇADO", "O instalador do Windows foi iniciado.\nContinue o processo pelas janelas do Setup.");
+                    }
+                    else
+                    {
+                        ShowError("Falha ao iniciar o processo de atualização.");
+                    }
+                }
+                _isUpgrade = false; // Reset
+                return;
+            }
+
+            OverlayConfig.Visibility = Visibility.Collapsed;
+
+            if (_isLinux)
+            {
+                var result = System.Windows.MessageBox.Show(
+                    "AVISO IMPORTANTE: Comportamento de Boot Linux\n\n" +
+                    "Em alguns PCs, ao reiniciar, o sistema pode entrar direto no menu do Linux (GRUB) ou ficar em tela preta.\n\n" +
+                    "SE ISSO ACONTECER:\n" +
+                    "1. No menu do GRUB, selecione 'Windows Boot Manager' ou 'Boot from next volume'.\n" +
+                    "2. Se não conseguir sair, force o desligamento e ligue novamente entrando na BIOS/Boot Menu (F12/Del) para selecionar o Windows.\n\n" +
+                    "Deseja continuar com a criação?",
+                    "Alerta de Dual Boot",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result != MessageBoxResult.Yes) return;
+            }
+            
+            var selectedPart = ComboPartitions.SelectedItem as PartitionInfo;
+            if (selectedPart == null) return;
+
+            string isoPath = TxtIsoPath.Text;
+            bool bypass = ChkBypassTpm.IsChecked ?? false;
+            bool local = ChkLocalAccount.IsChecked ?? false;
+            bool privacy = ChkDisablePrivacy.IsChecked ?? false;
+            bool inject = ChkInjectKit.IsChecked ?? false;
+            bool cleanup = ChkAutoCleanup.IsChecked ?? false;
+            bool auto = ChkFullAuto.IsChecked ?? false;
+            bool isMultiIso = ChkMultiIso.IsChecked ?? false;
+            string user = TxtUserName.Text;
+            string pass = TxtPassword.Password;
+
+            if (_isBusy) return;
+            _isBusy = true;
+            OverlayBusy.Visibility = Visibility.Visible;
+
+            try
+            {
+                // 1. Criar Partição (Tamanho Adaptativo)
+                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
+                int sizeMb = requiredGb * 1024;
+                
+                UpdateStatus($"Criando partição de {requiredGb}GB (Smart Size)...");
+                bool partOk = await WinbootManager.CreateBootPartition(selectedPart.DriveLetter, sizeMb, WinbootManager.WINBOOT_LABEL, isMultiIso);
+                if (!partOk) throw new Exception("Falha ao criar partição. O disco pode não ter espaço não alocado suficiente.");
+
+                // 2. Localizar a nova partição
+                await Task.Delay(2000); // 2s delay
+                var disks = WinbootManager.GetDisks();
+                var newPart = disks.SelectMany(d => d.Partitions)
+                                  .FirstOrDefault(p => p.Label.Equals(WinbootManager.WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase) ||
+                                                       p.Label.StartsWith("KITLUGIA", StringComparison.OrdinalIgnoreCase));
+
+                if (newPart == null || string.IsNullOrEmpty(newPart.DriveLetter))
+                    throw new Exception("A partição foi criada mas não recebeu uma letra de unidade.");
+
+                string winbootDrive = newPart.DriveLetter;
+
+                // 3. Extrair ISO com Detecção em Tempo Real
+                UpdateStatus("Extraindo arquivos e detectando loader...");
+                var bootInfo = await WinbootManager.ExtractFiles(isoPath, winbootDrive);
+
+                if (bootInfo == null)
+                {
+                    WinbootManager.Log("ERRO: Nenhuma imagem de boot (WIM/EFI) detectada na ISO.");
+                    throw new Exception("Falha na detecção do loader da ISO.");
+                }
+
+                WinbootManager.Log($"Loader detectado: {bootInfo.Value.Description}");
+                // 3.5 Aplicar Customizações (Rufus-style + Automação)
+                if (!isMultiIso)
+                {
+                    UpdateStatus("Aplicando automações pós-instalação...");
+                    bool customOk = await WinbootManager.ApplyCustomizations(
+                        winbootDrive,
+                        bypass,
+                        local,
+                        privacy,
+                        inject,
+                        cleanup,
+                        _customXmlPath,
+                        user,
+                        pass,
+                        auto,
+                        (uint)selectedPart.DiskIndex,
+                        (uint)selectedPart.Index,
+                        _injectedPath);
+
+                    if (!customOk) WinbootManager.Log("Aviso: Falha ao aplicar algumas automações, mas o processo continuará.");
+                }
+                else
+                {
+                    WinbootManager.Log("Modo Multi-ISO detectado: Pulando customizações específicas de Windows (unattend.xml).");
+                }
+
+                // 4. Configurar BOOT
+                UpdateStatus("Configurando BCD Bootloader...");
+                string? bootGuid = null;
+                
+                if (bootInfo.Value.IsWim)
+                {
+                    bootGuid = await WinbootManager.CreateRamdiskEntry(
+                        bootInfo.Value.Description, 
+                        winbootDrive, 
+                        bootInfo.Value.WimPath, 
+                        bootInfo.Value.SdiPath);
+                }
+                else
+                {
+                    // Linux / Generic Multi-ISO - Modo INTEGRADO (Strelec Style)
+                    UpdateStatus("Aplicando Turbo Boot (Patch Linux)...");
+                    await WinbootManager.PatchLinuxConfig(winbootDrive);
+
+                    if (WinbootManager.IsEfiMode())
+                    {
+                        UpdateStatus("Acelerando para Linux via NVRAM Direta...");
+                        bootGuid = await WinbootManager.CreateDirectNvramBoot(winbootDrive, bootInfo.Value.Description);
+                    }
+                    else
+                    {
+                        // Fallback para Legacy
+                        bootGuid = "{kitlugia-linux-legacy}";
+                    }
+                }
+
+                if (bootGuid == null)
+                {
+                    if (bootInfo.Value.IsWim)
+                    {
+                        throw new Exception("Falha ao configurar o BCD (bcdedit). Verifique o log.");
+                    }
+                    else
+                    {
+                        WinbootManager.Log("Aviso: Não foi possível criar a Ponte de Boot. Fallback para modo Manual (F12).");
+                        bootGuid = "{kitlugia-manual-f12}";
+                    }
+                }
+
+                UpdateStatus("PROCESSO CONCLUÍDO COM SUCESSO!");
+                
+                string msg = "Winboot configurado com sucesso!\n\n";
+
+                if (!bootInfo.Value.IsWim)
+                {
+                    if (bootGuid == "{kitlugia-uefi-jump}")
+                    {
+                        msg += " 🚀 MODO UNIVERSAL ATIVADO (SALTO DIRETO) 🚀 \n\n" +
+                               "1. Reinicie o computador agora\n" +
+                               "2. O KitLugia configurou um salto direto para o Linux.\n" +
+                               "3. O PC entrará no menu do Linux AUTOMATICAMENTE!\n\n" +
+                               "DICA: Você não precisa apertar F12 nem usar a Tela Azul.";
+                    }
+                    else if (bootGuid == "{kitlugia-manual-f12}")
+                    {
+                        msg += " ⚠️ MODO MANUAL (PONTE NÃO DISPONÍVEL) ⚠️ \n\n" +
+                               "1. Reinicie o computador\n" +
+                               "2. Aperte F12 (ou DEL/F2) durante o boot\n" +
+                               "3. Selecione a partição KITLUGIA no menu da BIOS\n\n" +
+                               "CAUSA: Não foi possível configurar o Menu de Boot automático (BCD).";
+                    }
+                    else
+                    {
+                        msg += " 🚀 MODO DUAL BOOT INTEGRADO (STRELEC ENGINE) \n\n" +
+                               "1. Reinicie o computador\n" +
+                               "2. Na Tela Azul (Windows Boot Menu), escolha a entrada de Linux\n" +
+                               "3. O KitLugia usará o motor do Strelec para carregar o GRUB automaticamente.\n\n" +
+                               "VANTAGEM: Você não precisa apertar F12. Funciona direto pela Tela Azul!";
+                    }
+                }
+                else
+                {
+                    msg += "Agora você pode reiniciar seu PC.";
+                }
+
+                System.Windows.MessageBox.Show(msg, "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            }
+            catch (Exception ex)
+            {
+                WinbootManager.Log($"FATAL ERROR: {ex.Message}");
+                ShowError($"Falha crítica: {ex.Message}\n\nVerifique o LOG DETALHADO abaixo.");
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+        }
+
+
+
+
+        private void BtnRemove_Click(object sender, RoutedEventArgs e)
+        {
+             var candidates = WinbootManager.GetRemovablePartitions();
+
+             if (candidates.Count == 0)
+             {
+                 if (ConfirmAction("Nenhuma partição Winboot detectada no disco.\n\nDeseja realizar uma varredura para limpar entradas de boot antigas (Múltiplos Boots na Tela Azul) criadas pelo KitLugia?"))
+                 {
+                     ExecuteBcdCleanup();
+                 }
+                 return;
+             }
+
+             if (candidates.Count == 1)
+             {
+                 var target = candidates[0];
+                 if (ConfirmAction($"Encontrada partição Winboot em {target.DriveLetter} ({target.Label} - {target.Size / 1024 / 1024 / 1024} GB).\n\nDeseja DELETAR a partição e as entradas de boot da Tela Azul?"))
+                 {
+                     ExecuteRemoval(target);
+                 }
+                 return;
+             }
+
+             // Múltiplos candidatos -> Abrir Overlay
+             WinbootManager.Log($"Encontrados {candidates.Count} candidatos para remoção. Abrindo seletor...");
+             ComboRemovalCandidates.ItemsSource = candidates.Select(p => new { Value = p, DisplayName = $"[{p.DriveLetter}] {p.Label} ({p.Size / 1024 / 1024 / 1024} GB) - Disk {p.DiskIndex}" }).ToList();
+             ComboRemovalCandidates.SelectedIndex = 0;
+             OverlayRemoval.Visibility = Visibility.Visible;
+        }
+
+        private void BtnCancelRemoval_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayRemoval.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnConfirmRemoval_Click(object sender, RoutedEventArgs e)
+        {
+            if (ComboRemovalCandidates.SelectedItem == null) return;
+            
+            // Reflexão simples para pegar o Value do tipo anônimo (ou criar classe dedicada, mas dynamic funciona aqui)
+            dynamic selectedItem = ComboRemovalCandidates.SelectedItem;
+            PartitionInfo target = selectedItem.Value;
+
+            OverlayRemoval.Visibility = Visibility.Collapsed;
+            ExecuteRemoval(target);
+        }
+
+        private async Task ExecuteRemoval(PartitionInfo target)
+        {
+             SetBusy(true, $"Removendo Winboot ({target.Label})...");
+             try
+             {
+                 bool ok = await WinbootManager.RemoveWinboot(target);
+                 if (ok)
+                 {
+                     ShowSuccess("REMOVIDO", "A partição foi deletada e as entradas de boot foram limpas com sucesso.\nO espaço foi devolvido à unidade vizinha.");
+                     RefreshDisks();
+                 }
+                 else
+                 {
+                     ShowError("Houve um problema ao remover. Verifique o Log Detalhado (pode ser necessário limpar manualmente no DiskMgmt).");
+                 }
+             }
+             catch(Exception ex)
+             {
+                 WinbootManager.Log($"Erro no processo de remoção: {ex.Message}");
+                 ShowError($"Erro de excecão: {ex.Message}");
+             }
+             finally
+             {
+                 SetBusy(false);
+             }
+        }
+
+        private async void ExecuteBcdCleanup()
+        {
+             SetBusy(true, "Limpando entradas BCD antigas...");
+             try
+             {
+                 bool ok = await WinbootManager.CleanBcdEntriesAsync();
+                 if (ok) ShowSuccess("LIMPEZA", "As entradas de boot antigas foram removidas da Tela Azul com sucesso.");
+                 else ShowError("Houve um erro ao limpar o BCD. Verifique o Log Detalhado.");
+             }
+             catch(Exception ex)
+             {
+                 ShowError($"Erro de exceção: {ex.Message}");
+             }
+             finally
+             {
+                 SetBusy(false);
+             }
+        }
+
+
+        private void SetBusy(bool busy, string status = "")
+        {
+            _isBusy = busy;
+            OverlayBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+            if (busy) TxtBusyStatus.Text = status;
+        }
+
+        private void UpdateStatus(string msg)
+        {
+            TxtStatus.Text = msg;
+            if (_isBusy) TxtBusyStatus.Text = msg;
+        }
+
+        private void ShowError(string msg) => System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(msg, "Erro Winboot", MessageBoxButton.OK, MessageBoxImage.Error));
+        private void ShowSuccess(string title, string msg) => System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(msg, title, MessageBoxButton.OK, MessageBoxImage.Information));
+        private bool ConfirmAction(string msg) => System.Windows.MessageBox.Show(msg, "Winboot - Confirmação", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+
+        // Propriedade para ser checada pelo MainWindow ao navegar
+        public bool CanNavigate()
+        {
+            if (_isBusy) return false;
+            return true;
+        }
+    }
+}

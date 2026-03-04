@@ -80,7 +80,7 @@ namespace KitLugia.GUI.Pages
         private void BtnCompactOS_Click(object sender, RoutedEventArgs e)
         {
             // Abre nova janela porque é um processo muito longo e externo
-            Toolbox.CompactOS();
+            _ = Task.Run(() => Toolbox.CompactOS());
             AddLog("Iniciado processo de CompactOS em janela externa.");
         }
     }

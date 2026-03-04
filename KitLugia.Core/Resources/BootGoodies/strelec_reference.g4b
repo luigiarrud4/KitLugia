@@ -1,0 +1,71 @@
+!BAT
+clear
+echo Strelec ISO
+echo
+# Change ISOC to defragged file if %ISOC% was fragmented
+#if not exist NONCONTIG call :.contigfix
+#if not exist CD partnew (%E2BDEV%,3) 0x0 %ISOC% || if not exist NONCONTIG blocklist %ISOC% && if not exist NONCONTIG call echo -e %emsg% && if not exist NONCONTIG pause --wait=5
+
+#always swap hd0 and hd1 in case user uses windows bootfix tools
+set SWP01=1
+
+set WW=%ISOC%
+if "%WW:~0,2%"=="()" set WW=%WW:~2,199%
+if "%WW:~0,4%"=="(bd)" set WW=%WW:~4,199%
+if "%WW:~0,7%"=="(%E2BDEV%,0)" set WW=%WW:~7,199%
+if "%WW:~0,7%"=="(%E2BDEV%,1)" set WW=%WW:~7,199%
+if "%WW:~0,7%"=="(%E2BDEV%,2)" set WW=%WW:~7,199%
+#fill (rd) with 0's , 0x60000 is rd-base mem address, Fn24 is memset - fill memory  <addr> <string> <size>
+call Fn.24  0x60000 0x20  102400 > nul ;; map (md)0x300+200 (rd) > nul
+dd if=(rd)+1 of=()/_ISO/e2b/firadisk/ISONAME.CMD > nul
+write (bd)/_ISO/e2b/firadisk/ISONAME.CMD SET \"MYISO=%WW%\"\r\n > nul
+cat --locate=/ --replace=\\ (bd)/_ISO/e2b/firadisk/ISONAME.CMD > nul
+set WW=
+
+set E2B=
+if exist (hd3,0)/_ISO/e2b/grub/e2b.cfg set E2B=(hd3,0)
+if exist (hd0,0)/_ISO/e2b/grub/e2b.cfg set E2B=(hd0,0)
+if exist (hd2,0)/_ISO/e2b/grub/e2b.cfg set E2B=(hd2,0)
+if exist (hd1,0)/_ISO/e2b/grub/e2b.cfg set E2B=(hd1,0)
+map  %ISOC% (0xff) > nul || map --mem %ISOC% (0xff)
+map --hook
+
+set FOLDER=(0xff)/SSTR
+kernel /%grub%/wimboot index=1
+
+if not exist %FOLDER%/boot.sdi echo ERROR: %FOLDER%/boot.sdi does not exist
+
+if not exist %E2B%/_ISO/e2b/grub/strelec.bat echo ERROR: %E2B%/_ISO/e2b/grub/strelec.bat does not exist
+set bmgr=
+if exist %E2B%/_ISO/e2b/grub/DPMS/NTBOOT.MOD/bootmgr set "bmgr=@bootmgr=%E2B%/_ISO/e2b/grub/DPMS/NTBOOT.MOD/bootmgr"
+if not exist %E2B%/_ISO/e2b/grub/DPMS/NTBOOT.MOD/bootmgr echo ERROR: %E2B%/_ISO/e2b/grub/DPMS/NTBOOT.MOD/bootmgr does not exist
+if not exist %E2B%/_ISO/e2b/grub/DPMS/NTBOOT.MOD/bcd echo ERROR: %E2B%/_ISO/e2b/grub/DPMS/NTBOOT.MOD/bcd does not exist
+if not exist %E2B%/_ISO/e2b/grub/winpeshl.ini echo ERROR: %E2B%/_ISO/e2b/grub/winpeshl.ini does not exist
+
+echo
+if exist %FOLDER%/strelec10x64Eng.wim echo 1 Strelec10x64Eng.wim (64-bit)
+if exist %FOLDER%/strelec10Eng.wim    echo 2 Strelec10Eng.wim    (32-bit)
+if exist %FOLDER%/strelec10x64.wim    echo 3 Strelec1064.wim     (64-bit)
+if exist %FOLDER%/strelec10.wim       echo 4 Strelec10.wim       (32-bit)
+echo
+set /p ask=Choose: 
+echo
+if "%ask%"=="1" set bwim=%FOLDER%/strelec10x64Eng.wim
+if "%ask%"=="2" set bwim=%FOLDER%/strelec10Eng.wim
+if "%ask%"=="3" set bwim=%FOLDER%/strelec10x64.wim
+if "%ask%"=="4" set bwim=%FOLDER%/strelec10.wim
+
+echo
+if "%bwim%"=="" echo ERROR: No .wim file selected! && ls %FOLDER%/
+if not exist %bwim% echo ERROR: Cannot find %bwim% && ls %FOLDER%/
+echo
+echo Loading...
+initrd %bmgr% @startupe2b.bat=%E2B%/_ISO/e2b/grub/strelec.bat @winpeshl.ini=%E2B%/_ISO/e2b/grub/winpeshl.ini @bcd=%E2B%/_ISO/e2b/grub/DPMS/NTBOOT.MOD/bcd @boot.sdi=%FOLDER%/boot.sdi @boot.wim=%bwim%
+#check file extension for 01
+if "%SWP01%"=="1" if not exist CD map (hd0) (hd1) > nul
+if "%SWP01%"=="1" if not exist CD map (hd1) (hd0) > nul
+map --hook > nul
+if "%SWP01%"=="1" pause --wait=2 hd0-hd1 swapped
+set SWP01=
+boot
+

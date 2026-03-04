@@ -8,10 +8,9 @@ namespace KitLugia.Core
     [SupportedOSPlatform("windows")]
     public static partial class Toolbox
     {
-        // ... (outros métodos do CleanupManager permanecem iguais) ...
-
         public static (long TotalBytesFreed, List<string> Log) CleanTemporaryFiles()
         {
+            Logger.Log("Iniciando varredura de arquivos temporários...");
             long totalBytes = 0;
             var log = new List<string>();
 
@@ -28,6 +27,7 @@ namespace KitLugia.Core
 
         public static (long TotalBytesFreed, List<string> Log) CleanWindowsUpdateCache()
         {
+            Logger.Log("Verificando cache do Windows Update...");
             var log = new List<string>();
             string wuCachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "SoftwareDistribution", "Download");
 
@@ -39,6 +39,7 @@ namespace KitLugia.Core
 
         public static (long TotalBytesFreed, List<string> Log) CleanShaderCaches()
         {
+            Logger.Log("Verificando caches de shader (GPU)...");
             long totalBytes = 0;
             var log = new List<string>();
 
@@ -59,6 +60,7 @@ namespace KitLugia.Core
 
         public static (long TotalBytesFreed, List<string> Log) RunFullCleanup()
         {
+            Logger.Log("=== INICIANDO LIMPEZA COMPLETA DO SISTEMA ===");
             long totalBytes = 0;
             var fullLog = new List<string>();
 
@@ -74,18 +76,22 @@ namespace KitLugia.Core
             totalBytes += shaderResult.TotalBytesFreed;
             fullLog.AddRange(shaderResult.Log);
 
+            string mbFreed = (totalBytes / 1024.0 / 1024.0).ToString("N2");
+            Logger.Log($"[RESUMO] Limpeza finalizada. Total liberado: {mbFreed} MB");
+
             return (totalBytes, fullLog);
         }
 
         public static void CompactOS()
         {
+            Logger.Log("Iniciando CompactOS (Compressão do Sistema)...");
+            Logger.LogProcess("compact.exe", "/CompactOS:always");
+            // Abre janela externa pois demora muito
             SystemUtils.RunExternalProcess("cmd.exe", "/c compact.exe /CompactOS:always & pause", hidden: false, waitForExit: false);
         }
 
-
         /// <summary>
-        /// Helper interno para limpar todos os arquivos e subpastas de um diretório.
-        /// CORREÇÃO: Alterado de 'private' para 'internal' para ser acessível por outros managers.
+        /// Helper interno para limpar diretórios.
         /// </summary>
         internal static (long BytesFreed, int FilesDeleted, string Message) CleanDirectory(string path, string name)
         {
@@ -96,38 +102,56 @@ namespace KitLugia.Core
 
             long totalSize = 0;
             int fileCount = 0;
-            var dirInfo = new DirectoryInfo(path);
+
+            // Função local recursiva para lidar com UnauthorizedAccessException pasta a pasta
+            void Traverse(DirectoryInfo dir)
+            {
+                try
+                {
+                    foreach (var file in dir.GetFiles())
+                    {
+                        try
+                        {
+                            totalSize += file.Length;
+                            file.Delete();
+                            fileCount++;
+                        }
+                        catch { /* Ignora arquivos em uso/bloqueados */ }
+                    }
+
+                    foreach (var subDir in dir.GetDirectories())
+                    {
+                        Traverse(subDir);
+                        try { subDir.Delete(); } catch { /* Ignora pastas que ainda têm coisas bloqueadas */ }
+                    }
+                }
+                catch { /* Ignora pastas que negam acesso de leitura (ex: subpastas no Windows Temp) */ }
+            }
 
             try
             {
-                var files = dirInfo.GetFiles("*", SearchOption.AllDirectories);
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        totalSize += file.Length;
-                        file.Delete();
-                        fileCount++;
-                    }
-                    catch { /* Ignora arquivos em uso. */ }
-                }
-
-                var dirs = dirInfo.GetDirectories();
-                foreach (var dir in dirs)
-                {
-                    try { dir.Delete(true); }
-                    catch { /* Ignora pastas em uso. */ }
-                }
+                Traverse(new DirectoryInfo(path));
             }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex)
             {
-                return (0, 0, $"'{name}': Acesso negado. Tente executar como Administrador.");
+                Logger.LogError("Limpeza", $"Acesso negado raiz em '{name}': {ex.Message}");
             }
 
+            string msg;
             if (fileCount > 0)
-                return (totalSize, fileCount, $"'{name}': {fileCount} arquivos removidos ({totalSize / (1024.0 * 1024.0):N2} MB liberados).");
+            {
+                string sizeMb = (totalSize / (1024.0 * 1024.0)).ToString("N2");
+                msg = $"'{name}': {fileCount} arquivos removidos ({sizeMb} MB liberados).";
+                // Envia para o console preto
+                Logger.Log($"[LIMPEZA] {msg}");
+            }
             else
-                return (0, 0, $"'{name}': Nenhuma limpeza necessária.");
+            {
+                msg = $"'{name}': Nenhuma limpeza necessária.";
+                Logger.Log($"[LIMPEZA] {name}: Nada a limpar.");
+            }
+
+            return (totalSize, fileCount, msg);
         }
     }
 }

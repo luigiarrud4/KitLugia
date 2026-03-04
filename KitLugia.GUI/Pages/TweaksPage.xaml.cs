@@ -15,14 +15,15 @@ namespace KitLugia.GUI.Pages
         private bool _isLoading = true;
         private readonly SolidColorBrush _colorActive = new SolidColorBrush(Color.FromRgb(108, 203, 95));
         private readonly SolidColorBrush _colorDefault = new SolidColorBrush(Color.FromRgb(150, 150, 150));
+        private readonly SolidColorBrush _colorSlideActive = new SolidColorBrush(Color.FromRgb(255, 170, 0)); // Amarelo Escuro para SLIDE
 
         public TweaksPage()
         {
             InitializeComponent();
-            LoadCurrentStatus();
+            _ = LoadCurrentStatus();
         }
 
-        private async void LoadCurrentStatus()
+        private async Task LoadCurrentStatus()
         {
             await Task.Run(() =>
             {
@@ -30,6 +31,13 @@ namespace KitLugia.GUI.Pages
                 bool mpoDisabled = SystemTweaks.IsMpoDisabled();
                 bool vbsEnabledInSystem = SystemTweaks.IsVbsEnabled();
                 bool bingDisabled = SystemTweaks.IsBingDisabled();
+                bool memoryUsageEnabled = SystemTweaks.IsMemoryUsageEnabled();
+                bool timerOptimized = SystemTweaks.IsTimerResolutionOptimized();
+                bool shutdownOptimized = SystemTweaks.IsFastShutdownEnabled();
+
+                bool slideInput = SystemTweaks.IsInputLatencyOptimized();
+                bool slideUsb = SystemTweaks.IsUsbPowerSavingDisabled();
+                bool slideGaming = SystemTweaks.IsGamingLatencyOptimized();
 
                 Dispatcher.Invoke(() =>
                 {
@@ -48,6 +56,24 @@ namespace KitLugia.GUI.Pages
                     ChkBing.IsChecked = bingDisabled;
                     UpdateLabel(StatusBing, bingDisabled, "Limpo", "Padrão");
 
+                    ChkMemoryUsage.IsChecked = memoryUsageEnabled;
+                    UpdateLabel(StatusMemoryUsage, memoryUsageEnabled, "Otimizado", "Padrão");
+
+                    ChkTimer.IsChecked = timerOptimized;
+                    UpdateLabel(StatusTimer, timerOptimized, "Latência Mínima", "Padrão");
+
+                    ChkShutdown.IsChecked = shutdownOptimized;
+                    UpdateLabel(StatusShutdown, shutdownOptimized, "⚡ Turbo Boot", "Padrão");
+
+                    ChkSlideInput.IsChecked = slideInput;
+                    UpdateSlideLabel(StatusSlideInput, slideInput, "Nível Máximo", "Padrão");
+
+                    ChkSlideUsb.IsChecked = slideUsb;
+                    UpdateSlideLabel(StatusSlideUsb, slideUsb, "Desativado", "Padrão");
+
+                    ChkSlideGaming.IsChecked = slideGaming;
+                    UpdateSlideLabel(StatusSlideGaming, slideGaming, "Extremo (GameDVR OFF)", "Padrão");
+
                     _isLoading = false;
                 });
             });
@@ -59,7 +85,62 @@ namespace KitLugia.GUI.Pages
             label.Foreground = isActive ? _colorActive : _colorDefault;
         }
 
+        private void UpdateSlideLabel(TextBlock label, bool isActive, string textActive, string textInactive)
+        {
+            label.Text = isActive ? textActive : textInactive;
+            label.Foreground = isActive ? _colorSlideActive : _colorDefault;
+        }
+
         // --- CLIQUES ---
+
+        private async void ChkSlideInput_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool targetActive = ChkSlideInput.IsChecked == true;
+            UpdateSlideLabel(StatusSlideInput, targetActive, "Aplicando...", "Revertendo...");
+
+            await Task.Run(() =>
+            {
+                if (targetActive) SystemTweaks.OptimizeInputLatency();
+                else SystemTweaks.RevertInputLatency();
+            });
+
+            UpdateSlideLabel(StatusSlideInput, targetActive, "Nível Máximo", "Padrão");
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("REINÍCIO NECESSÁRIO", "As mudanças na latência de input exigem reiniciar o computador.");
+        }
+
+        private async void ChkSlideUsb_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool targetActive = ChkSlideUsb.IsChecked == true;
+            UpdateSlideLabel(StatusSlideUsb, targetActive, "Aplicando...", "Revertendo...");
+
+            await Task.Run(() =>
+            {
+                if (targetActive) SystemTweaks.DisableUsbPowerSaving();
+                else SystemTweaks.RevertUsbPowerSaving();
+            });
+
+            UpdateSlideLabel(StatusSlideUsb, targetActive, "Desativado", "Padrão");
+        }
+
+        private async void ChkSlideGaming_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool targetActive = ChkSlideGaming.IsChecked == true;
+            UpdateSlideLabel(StatusSlideGaming, targetActive, "Aplicando...", "Revertendo...");
+
+            await Task.Run(() =>
+            {
+                if (targetActive) SystemTweaks.OptimizeGamingLatency();
+                else SystemTweaks.RevertGamingLatency();
+            });
+
+            UpdateSlideLabel(StatusSlideGaming, targetActive, "Extremo (DWM/GameDVR OFF)", "Padrão");
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("REINÍCIO NECESSÁRIO", "As alterações estruturais do Thread e GameDVR exigem reiniciar o computador.");
+        }
 
         private void ChkGameMode_Click(object sender, RoutedEventArgs e)
         {
@@ -132,6 +213,46 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("PESQUISA RESTAURADA", "Sugestões do Bing na busca foram reativadas.");
             }
+        }
+
+        private void ChkMemoryUsage_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            var result = SystemTweaks.ToggleMemoryUsage();
+
+            bool nowActive = ChkMemoryUsage.IsChecked == true;
+            UpdateLabel(StatusMemoryUsage, nowActive, "Otimizado", "Padrão");
+
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("REINÍCIO NECESSÁRIO", $"{result.Message}\nO Windows precisa ser reiniciado para aplicar.");
+        }
+
+        private void ChkTimer_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            var result = SystemTweaks.ToggleTimerResolution();
+
+            bool nowActive = ChkTimer.IsChecked == true;
+            UpdateLabel(StatusTimer, nowActive, "Latência Mínima", "Padrão");
+
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("REINÍCIO NECESSÁRIO", $"{result.Message}\nO Windows precisa ser reiniciado para aplicar as mudanças de Timer.");
+        }
+
+        private void ChkShutdown_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            SystemTweaks.ToggleFastShutdown();
+
+            bool nowActive = ChkShutdown.IsChecked == true;
+            UpdateLabel(StatusShutdown, nowActive, "⚡ Turbo Boot", "Padrão");
+
+            // Update Tray if exists
+            var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
+            if (tray != null) tray.TurboShutdownEnabled = nowActive;
+
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("REINÍCIO NECESSÁRIO", "Sistema de desligamento otimizado.\nRecomendado reiniciar para aplicar as mudanças de registro.");
         }
     }
 }

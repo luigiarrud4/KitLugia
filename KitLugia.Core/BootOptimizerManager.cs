@@ -7,41 +7,55 @@ using System.Runtime.Versioning;
 namespace KitLugia.Core
 {
     [SupportedOSPlatform("windows")]
-    public static partial class Toolbox
+    public static class BootOptimizerManager
     {
+        // =========================================================
+        // ANÁLISE DE INICIALIZAÇÃO (BOOT)
+        // =========================================================
+
         /// <summary>
-        /// Analisa os eventos de inicialização (boot) do Windows para identificar gargalos.
+        /// Realiza uma análise completa da última inicialização do sistema.
         /// </summary>
-        /// <returns>Um objeto 'BootAnalysisResult' com os dados da análise.</returns>
+        /// <returns>Objeto contendo o tempo total e listas de apps problemáticos.</returns>
         public static BootAnalysisResult AnalyzeBootPerformance()
         {
             var result = new BootAnalysisResult();
 
-            // Passo 1: Verificar se o serviço de coleta de logs de performance está ativo.
+            // 1. Verifica se o serviço de monitoramento do Windows está ativo
+            // Sem o serviço "pla" (Performance Logs & Alerts), o Windows não grava esses dados.
             if (SystemUtils.GetServiceStartMode("pla") == "Disabled")
             {
-                result.ServiceStatusMessage = "AVISO: O serviço 'Logs e Alertas de Desempenho' (pla) está desativado. A análise pode estar incompleta.";
+                result.ServiceStatusMessage = "AVISO: O serviço 'Logs e Alertas de Desempenho' (pla) está desativado. O Windows não registrou detalhes do boot.";
             }
 
-            // Passo 2: Obter os dados brutos.
+            // 2. Busca os eventos brutos (ID 100 = Boot Total, 101-199 = Degradação por Apps)
             var allEvents = SystemTweaks.GetPerformanceEvents(100, 101, 199);
+
+            // Pega os apps de inicialização atuais para cruzar dados
             var startupApps = StartupManager.GetStartupAppsWithDetails(true);
 
+            // Define o evento principal (Tempo Total)
             result.TotalTimeEvent = allEvents.FirstOrDefault(e => e.EventId == 100);
 
-            // Passo 3: Filtrar e processar os eventos relevantes.
+            // 3. Filtra itens lentos (> 1 segundo) do último mês
+            // Agrupa por nome para pegar sempre a ocorrência mais recente de cada app
             var recentSlowItems = allEvents
                 .Where(e => e.EventId != 100 && e.TimeTaken > 1000 && e.TimeOfEvent >= DateTime.Now.AddMonths(-1))
                 .GroupBy(e => e.ItemName)
                 .Select(g => g.OrderByDescending(e => e.TimeOfEvent).First())
                 .ToList();
 
-            // Passo 4: Classificar os itens lentos.
+            // 4. Separação Inteligente:
+
+            // LISTA A: Itens que estão na sua inicialização automática (Otimizáveis)
+            // Ex: Discord, Steam, Spotify
             result.SlowStartupItems = recentSlowItems
                 .Where(e => startupApps.Any(s => s.FullCommand.Contains(e.ItemName, StringComparison.OrdinalIgnoreCase)))
                 .OrderByDescending(e => e.TimeTaken)
                 .ToList();
 
+            // LISTA B: Itens que causaram lentidão, mas não iniciam sozinhos (Serviços do Sistema ou Apps abertos manualmente)
+            // Ex: Antivírus, Drivers de Vídeo, Windows Update
             result.HighImpactApps = recentSlowItems
                 .Where(e => !result.SlowStartupItems.Any(s => s.ItemName == e.ItemName))
                 .OrderByDescending(e => e.TimeTaken)
@@ -50,24 +64,37 @@ namespace KitLugia.Core
             return result;
         }
 
+        // =========================================================
+        // ANÁLISE DE DESLIGAMENTO (SHUTDOWN)
+        // =========================================================
+
         /// <summary>
-        /// Analisa o tempo total do último desligamento (shutdown).
+        /// Retorna o evento de tempo total do último desligamento.
         /// </summary>
         public static PerformanceEvent? AnalyzeShutdownPerformance()
         {
-            var shutdownEvents = SystemTweaks.GetPerformanceEvents(200, 201, 299);
+            // ID 200 = Shutdown Total
+            var shutdownEvents = SystemTweaks.GetPerformanceEvents(200, 200, 299);
             return shutdownEvents.FirstOrDefault(e => e.EventId == 200);
         }
 
+        // =========================================================
+        // UTILITÁRIOS
+        // =========================================================
+
         /// <summary>
-        /// Abre uma pesquisa no Google para ajudar o usuário a entender o que é um determinado processo.
+        /// Abre uma pesquisa no Google para ajudar o usuário a entender o que é um processo desconhecido.
+        /// Útil para o menu de contexto da lista de boot.
         /// </summary>
-        public static void OpenGoogleSearch(string itemName)
+        public static void SearchBootItemOnline(string itemName)
         {
             try
             {
-                string query = Uri.EscapeDataString($"what is {itemName}");
+                // Remove extensão .exe para melhorar a busca
+                string queryName = itemName.Replace(".exe", "", StringComparison.OrdinalIgnoreCase);
+                string query = Uri.EscapeDataString($"what is {queryName} process windows");
                 string url = $"https://www.google.com/search?q={query}";
+
                 Process.Start(new ProcessStartInfo("cmd", $"/c start {url}") { CreateNoWindow = true });
             }
             catch { }

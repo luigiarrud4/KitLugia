@@ -11,15 +11,12 @@ namespace KitLugia.Core
     {
         /// <summary>
         /// Define o servidor DNS para um provedor específico (Cloudflare, Google) ou reverte para DHCP.
-        /// Ponto de entrada principal para a UI.
         /// </summary>
-        /// <param name="provider">O nome do provedor: "CLOUDFLARE", "GOOGLE", ou "DHCP".</param>
         public static (bool Success, string Message) SetDns(string provider)
         {
-            // Validação de permissão é a primeira e mais importante etapa.
             if (!SystemUtils.IsAdmin())
             {
-                return (false, "Acesso Negado!\n\nPara alterar as configurações de DNS, o KitLugia precisa ser executado como Administrador.");
+                return (false, "Acesso Negado!\nExecute como Administrador para alterar o DNS.");
             }
 
             switch (provider.ToUpper())
@@ -36,6 +33,45 @@ namespace KitLugia.Core
         }
 
         /// <summary>
+        /// Configura o algoritmo de controle de congestionamento TCP para CTCP (Compound TCP).
+        /// O padrão (CUBIC) foca em largura de banda. CTCP foca em manter a janela de transmissão estável,
+        /// reduzindo a perda de pacotes e picos de lag em conexões instáveis.
+        /// </summary>
+        public static (bool Success, string Message) ApplyLatencyCongestionControl()
+        {
+            try
+            {
+                // 1. Desativa a heurística do Windows (auto-ajustes antigos que causam instabilidade)
+                SystemUtils.RunExternalProcess("netsh", "int tcp set heuristics disabled", hidden: true);
+
+                // 2. Define CTCP como provedor de congestionamento (Ideal para jogos/VoIP)
+                SystemUtils.RunExternalProcess("netsh", "int tcp set supplemental template=internet congestionprovider=ctcp", hidden: true);
+
+                // 3. Limita o autotuning para 'normal'. 'Disabled' limita a velocidade, 'Normal' é o equilíbrio.
+                SystemUtils.RunExternalProcess("netsh", "int tcp set global autotuninglevel=normal", hidden: true);
+
+                // 4. Desativa ECN (Explicit Congestion Notification). Roteadores antigos dropam pacotes com isso.
+                SystemUtils.RunExternalProcess("netsh", "int tcp set global ecncapability=disabled", hidden: true);
+
+                // 5. Desativa RSC (Receive Segment Coalescing). 
+                // CRÍTICO: RSC agrupa pacotes na placa de rede para economizar CPU, mas aumenta o ping.
+                SystemUtils.RunExternalProcess("netsh", "int tcp set global rsc=disabled", hidden: true);
+
+                // 6. Desativa TCP Chimney Offload (Processamento na NIC que às vezes falha)
+                SystemUtils.RunExternalProcess("netsh", "int tcp set global chimney=disabled", hidden: true);
+
+                // 7. Desativa Timestamps (Reduz overhead do cabeçalho TCP - ganho marginal de latência)
+                SystemUtils.RunExternalProcess("netsh", "int tcp set global timestamps=disabled", hidden: true);
+
+                return (true, "Algoritmo TCP ajustado para CTCP e RSC desativado para menor jitter.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao aplicar otimização TCP (CTCP): {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Helper interno que executa os comandos PowerShell para aplicar as configurações de DNS.
         /// </summary>
         private static (bool Success, string Message) SetDnsServers(string provider, string? primaryDns, string? secondaryDns)
@@ -43,7 +79,7 @@ namespace KitLugia.Core
             try
             {
                 string psScript;
-                // Este script robusto foca apenas em adaptadores de rede físicos e ativos.
+                // Busca apenas interfaces físicas ativas, ignorando VPNs e virtuais.
                 string findInterfacesPart =
                     "$interfaces = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Virtual -eq $false };";
 
@@ -57,17 +93,11 @@ namespace KitLugia.Core
                     psScript = $"{findInterfacesPart} foreach ($if in $interfaces) {{ Set-DnsClientServerAddress -InterfaceIndex $if.InterfaceIndex -ServerAddresses {ipArray} -Confirm:$false }}";
                 }
 
-                // Executa o comando e captura a saída para análise de erro.
                 string result = SystemUtils.RunExternalProcess("powershell", $"-NoProfile -ExecutionPolicy Bypass -Command \"{psScript}\"", hidden: true);
 
-                // Análise detalhada da resposta do PowerShell.
-                if (result.Contains("PermissionDenied", StringComparison.OrdinalIgnoreCase) || result.Contains("Acesso a um recurso CIM não estava disponível", StringComparison.OrdinalIgnoreCase))
+                if (result.Contains("PermissionDenied") || result.Contains("Erro"))
                 {
-                    return (false, $"O PowerShell retornou um erro de permissão.\n\nDetalhes:\n{result}");
-                }
-                if (result.Contains("Erro", StringComparison.OrdinalIgnoreCase))
-                {
-                    return (false, $"O PowerShell retornou um erro inesperado: {result}");
+                    return (false, $"Erro ao configurar DNS: {result}");
                 }
 
                 FlushDnsCache();
@@ -78,7 +108,7 @@ namespace KitLugia.Core
             }
             catch (Exception ex)
             {
-                return (false, $"Ocorreu um erro inesperado: {ex.Message}");
+                return (false, $"Erro inesperado: {ex.Message}");
             }
         }
 
@@ -99,26 +129,19 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Obtém informações sobre o DNS configurado na interface de rede principal (física e ativa).
-        /// Esta é a versão definitiva que ignora adaptadores virtuais.
+        /// Obtém informações sobre o DNS configurado na interface de rede principal.
         /// </summary>
         public static (string Provider, string DnsIp) GetActiveDnsInfo()
         {
             try
             {
-                // Lista de palavras-chave para identificar e ignorar adaptadores virtuais.
                 var virtualKeywords = new List<string> { "virtual", "vpn", "loopback", "tap", "hyper-v", "vmware", "vbox", "wsl", "docker" };
 
-                // Lógica de busca refinada para encontrar a conexão de internet "real".
                 var activeInterface = NetworkInterface.GetAllNetworkInterfaces()
                     .FirstOrDefault(i =>
-                        // 1. A interface deve estar conectada e funcionando.
                         i.OperationalStatus == OperationalStatus.Up &&
-                        // 2. Deve ser uma placa de rede principal (Ethernet ou Wi-Fi).
                         (i.NetworkInterfaceType == NetworkInterfaceType.Ethernet || i.NetworkInterfaceType == NetworkInterfaceType.Wireless80211) &&
-                        // 3. Essencial: deve ter um gateway (apontando para o seu roteador). Conexões sem gateway não são a internet principal.
                         i.GetIPProperties().GatewayAddresses.Any() &&
-                        // 4. Sua descrição NÃO PODE conter nenhuma palavra-chave de adaptador virtual.
                         !virtualKeywords.Any(keyword => i.Description.Contains(keyword, StringComparison.OrdinalIgnoreCase))
                     );
 
@@ -134,12 +157,8 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch (Exception)
-            {
-                // Ignora falhas de leitura, retornando o valor padrão.
-            }
+            catch { /* Falha silenciosa na leitura */ }
 
-            // Se nenhuma interface válida for encontrada, assume DHCP.
             return ("Automático (DHCP)", "N/A");
         }
     }

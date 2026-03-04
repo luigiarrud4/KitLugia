@@ -1,73 +1,218 @@
 ﻿<Page x:Class="KitLugia.GUI.Pages.DashboardPage"
-      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Sistema">
+xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+Title="Sistema">
+  
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,30,40,50" MaxWidth="850" HorizontalAlignment="Left">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="40,30,40,50" MaxWidth="850" HorizontalAlignment="Left">
+                <!-- TÍTULO -->
+                <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{StaticResource TextPrimary}"/>
 
-            <!-- TÍTULO -->
-            <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{StaticResource TextPrimary}"/>
+                <!-- BANNER INFORMATIVO (INFO PC) -->
+                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-            <!-- BANNER INFORMATIVO (INFO PC) -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25">
-                <Grid>
+                        <!-- Imagem PC -->
+                        <TextBlock Text="💻" FontSize="48" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtPCName" Text="DESKTOP-NAME" FontSize="20" FontWeight="Bold"/>
+                            <TextBlock x:Name="TxtSpecs" Text="Carregando informações..." FontSize="14" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0"/>
+                            <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- === NOVA SEÇÃO: AÇÕES DE 1-CLIQUE === -->
+                <TextBlock Text="Otimização Inteligente (1-Clique)" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                <Grid Margin="0,0,0,30">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Imagem PC (Usando Emoji como Placeholder) -->
-                    <TextBlock Text="💻" FontSize="48" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                    <!-- BOTÃO 1: OTIMIZAÇÃO INTELIGENTE (VERDE) -->
+                    <Button Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personalização da otimização inteligente.">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#104CAF50" BorderBrush="#334CAF50" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtPCName" Text="DESKTOP-NAME" FontSize="20" FontWeight="Bold"/>
-                        <TextBlock x:Name="TxtSpecs" Text="Carregando informações..." FontSize="14" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0"/>
-                        <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,3,0,0"/>
-                    </StackPanel>
+                                        <!-- Ícone -->
+                                        <Border Background="#154CAF50" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="🚀" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
 
-                    <!-- Botão Rename -->
-                    <Button Grid.Column="2" Content="Renomear" Background="Transparent" Foreground="{StaticResource AccentColor}" BorderThickness="0" Cursor="Hand"/>
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="OTIMIZAÇÃO INTELIGENTE" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Personalizar &amp; Aplicar" Foreground="#81C784" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Escolha sua GPU e nível de VRAM dedicada." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#254CAF50"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#4CAF50"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#4CAF50" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <!-- BOTÃO 2: REVERTER / NORMAL (VERMELHO) -->
+                    <Button Grid.Column="2" Height="90" Click="BtnRevertNormal_Click" Cursor="Hand" ToolTip="Remove todas as otimizações aplicadas e volta ao padrão do Windows.">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#10F44336" BorderBrush="#33F44336" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Ícone -->
+                                        <Border Background="#15F44336" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="↩️" FontSize="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="REVERTER / NORMAL" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Restaurar Padrões" Foreground="#E57373" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Remove VRAM, Tweaks e Planos de Energia." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#25F44336"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#F44336"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#F44336" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                 </Grid>
-            </Border>
+                
+                <!-- A LISTA DE CARTÕES (NAVEGAÇÃO) -->
+                <TextBlock Text="Gerenciamento Manual" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
 
-            <!-- A LISTA DE CARTÕES -->
-
-            <!-- Grupo 1 -->
-            <TextBlock Text="Configurações Principais" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
-
-            <Button Style="{StaticResource SettingsCardStyle}" Tag="🚀" 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="⚡" 
                     Content="Modo de Desempenho e Tweaks"
                     ToolTip="Gerenciar otimizações de registro, prioridade de CPU e serviços"
                     Click="BtnGoToTweaks_Click"/>
 
-            <Button Style="{StaticResource SettingsCardStyle}" Tag="🗑️" 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🧹" 
                     Content="Armazenamento e Limpeza"
                     ToolTip="Limpar arquivos temporários, shaders e bloatware"
                     Click="BtnGoToCleanup_Click"/>
 
-            <Button Style="{StaticResource SettingsCardStyle}" Tag="📡" 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="📡" 
                     Content="Otimizador de Rede (Ping)"
                     ToolTip="Ajustes de DNS, TCP/IP e Adaptador para menor latência"
                     Click="BtnGoToNetwork_Click"/>
 
-            <Button Style="{StaticResource SettingsCardStyle}" Tag="🛡️" 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🛡️" 
                     Content="Privacidade e Segurança"
                     ToolTip="Verificar Defender, Desativar Telemetria e VBS"
                     Click="BtnGoToPrivacy_Click"/>
 
-            <!-- Separador -->
-            <TextBlock Text="Ferramentas Avançadas" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,20,0,10" FontWeight="SemiBold"/>
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🔒" 
+                    Content="O&amp;O ShutUp10"
+                    ToolTip="Controle completo de privacidade do Windows"
+                    Click="BtnGoToOOShutUp_Click"/>
 
-            <Button Style="{StaticResource SettingsCardStyle}" Tag="🔧" 
-                    Content="Reparo Automático (AIO)"
-                    ToolTip="Ferramentas estilo FixWin para corrigir problemas do sistema"/>
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🪄" 
+                    Content="Otimização Automática"
+                    ToolTip="Otimização Inteligente do Sistema"
+                    Click="BtnGoToOptimize_Click"/>
 
-            <Button Style="{StaticResource SettingsCardStyle}" Tag="🎮" 
-                    Content="Modo Gaming Extremo"
-                    ToolTip="Gerenciador de Planos de Energia e GPU"/>
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🛠️" 
+                    Content="Ferramentas Avançadas"
+                    ToolTip="Ferramentas avançadas de sistema"
+                    Click="BtnGoToAdvanced_Click"/>
 
-        </StackPanel>
-    </ScrollViewer>
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🔑" 
+                    Content="Microsoft Activation Scripts"
+                    ToolTip="Verificar status de ativação do Windows e Office"
+                    Click="BtnGoToActivation_Click"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- OVERLAY: MENU DE SELEÇÃO RÁPIDA -->
+        <Grid x:Name="OverlayQuickMenu" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                    Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" CornerRadius="12">
+                <StackPanel Margin="25">
+                    <TextBlock Text="Configurar Otimização" FontSize="20" FontWeight="Bold" Foreground="White" Margin="0,0,0,20"/>
+
+                    <!-- SELEÇÃO DE GPU -->
+                    <TextBlock Text="Adaptador de Vídeo (GPU):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="CmbGpu" Height="35" Margin="0,0,0,15" 
+                              Style="{StaticResource DarkComboBoxStyle}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Foreground="White" Padding="5"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- SELEÇÃO DE VRAM -->
+                    <TextBlock Text="VRAM Dedicada (Segment Size):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="CmbVram" Height="35" Margin="0,0,0,20" 
+                              Style="{StaticResource DarkComboBoxStyle}">
+                        <ComboBoxItem Content="Padrão (Automático)" IsSelected="True" Foreground="White"/>
+                        <ComboBoxItem Content="256 MB" Foreground="White"/>
+                        <ComboBoxItem Content="512 MB" Foreground="White"/>
+                        <ComboBoxItem Content="1024 MB (1GB)" Foreground="White"/>
+                        <ComboBoxItem Content="2048 MB (2GB)" Foreground="White"/>
+                        <ComboBoxItem Content="4096 MB (4GB)" Foreground="White"/>
+                    </ComboBox>
+
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- EXTRAS -->
+                    <CheckBox x:Name="ChkExtremeVisuals" Content="Modo Extreme (Remover Animações)" Foreground="White" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="ChkPowerPlan" Content="Ativar Plano Bitsum Highest Performance" IsChecked="True" Foreground="White" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="ChkTurboShutdown" Content="Desligamento Turbo (Shutdownturbo 2s)" IsChecked="True" Foreground="White" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="ChkSystemTweaks" Content="Tweaks de Registro (Cache, Explorer, Bing)" IsChecked="True" Foreground="White" Margin="0,0,0,25"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="CANCELAR" Height="35" Background="Transparent" BorderBrush="#444" Click="BtnCancelQuickMenu_Click" Foreground="#AAA"/>
+                        <Button Grid.Column="2" Content="OTIMIZAR AGORA" Height="35" Background="#4CAF50" BorderThickness="0" Click="BtnApplyCustomOptimization_Click" Foreground="White" FontWeight="Bold"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
 </Page>

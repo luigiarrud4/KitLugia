@@ -16,14 +16,79 @@
 
     <Border BorderBrush="{StaticResource AccentColor}" BorderThickness="1">
         <Grid>
+            <!-- DIVISÃO VERTICAL: CONTEÚDO EM CIMA, CONSOLE EM BAIXO -->
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <!-- App Principal -->
+                <RowDefinition Height="Auto"/>
+                <!-- Console (Expansível) -->
+            </Grid.RowDefinitions>
+
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="280"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- BOTOES DE JANELA -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" 
+            <!-- ========================================================= -->
+            <!-- ÁREA DE BOTÕES SUPERIORES (Direita) -->
+            <!-- ========================================================= -->
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" 
                         WindowChrome.IsHitTestVisibleInChrome="True" Margin="0,1,1,0" Panel.ZIndex="9999">
+
+                <!-- BOTÃO INTEGRIDADE (ESCUDO) -->
+                <RadioButton x:Name="BtnSecurity" GroupName="Menu" Tag="🛡️Scan" Content="Integridade do Sistema" 
+                             Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"
+                             ToolTip="Scanner de Segurança (Antigo Menu [S])"/>
+
+                <!-- BOTÃO DO CONSOLE (>_) -->
+                <Button x:Name="BtnConsole" Width="40" Height="32" Click="BtnConsole_Click"
+                        Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
+                        ToolTip="Abrir/Fechar Terminal">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4">
+                                <TextBlock Text=">_" Foreground="#00FF00" FontWeight="Bold" FontFamily="Consolas" 
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#2200FF00"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <!-- BOTÃO DE NOTIFICAÇÕES (SINO + CONTADOR) -->
+                <Button x:Name="BtnNotifications" Width="46" Height="32" Click="BtnNotifications_Click"
+                        Background="Transparent" BorderThickness="0" Margin="0,0,5,0" Cursor="Hand"
+                        ToolTip="Histórico de Notificações">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4">
+                                <Grid>
+                                    <TextBlock Text="🔔" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+
+                                    <!-- BADGE (CONTADOR VERMELHO) -->
+                                    <Border x:Name="Badge" Background="#FF4444" CornerRadius="7" MinWidth="14" Height="14" 
+                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,10,0"
+                                            Visibility="Collapsed">
+                                        <!-- Invisível por padrão -->
+                                        <TextBlock x:Name="TxtBadgeCount" Text="0" Foreground="White" FontSize="9" FontWeight="Bold" 
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" Padding="2,0"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#22FFFFFF"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <!-- BOTÕES DE JANELA -->
                 <Button Content="−" Width="46" Height="32" Foreground="White" Background="Transparent" 
                         BorderThickness="0" Click="BtnMinimize_Click" Style="{StaticResource {x:Type Button}}"/>
                 <Button Content="□" Width="46" Height="32" Foreground="White" Background="Transparent" 
@@ -51,8 +116,10 @@
                 </Button>
             </StackPanel>
 
-            <!-- MENU LATERAL -->
-            <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" 
+            <!-- ========================================================= -->
+            <!-- MENU LATERAL (ESQUERDA) -->
+            <!-- ========================================================= -->
+            <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource SidebarBackground}" 
                     BorderThickness="0,0,1,0" BorderBrush="{StaticResource CardBorder}">
                 <Grid Margin="15,25">
                     <Grid.RowDefinitions>
@@ -140,8 +207,6 @@
                                 </Border>
                             </Popup>
                         </Grid>
-                        <!-- FIM DA BARRA -->
-
                     </StackPanel>
 
                     <!-- ITENS DE MENU -->
@@ -149,40 +214,99 @@
                         <StackPanel>
                             <RadioButton x:Name="BtnDashboard" GroupName="Menu" Tag="🏠" Content="Sistema (Início)" IsChecked="True" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnTweaks"    GroupName="Menu" Tag="⚡" Content="Desempenho" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
+                            <RadioButton x:Name="BtnScreen"    GroupName="Menu" Tag="🖥️" Content="Tela e Cores" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnApps"      GroupName="Menu" Tag="📱" Content="Aplicativos (Bloat)" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
+                            <RadioButton x:Name="BtnIntegrity"  GroupName="Menu" Tag="🔐" Content="Segurança e Privacidade" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"
+                             ToolTip="Configurações de Segurança e Privacidade"/>
                             <RadioButton x:Name="BtnStorage"   GroupName="Menu" Tag="💿" Content="Armazenamento" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
+                            <RadioButton x:Name="BtnPartitions" GroupName="Menu" Tag="💽" Content="Gerenciar Discos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnNetwork"   GroupName="Menu" Tag="🌐" Content="Rede e Internet" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnGames"     GroupName="Menu" Tag="🎮" Content="Jogos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
-                            <RadioButton x:Name="BtnTools"     GroupName="Menu" Tag="🛠️" Content="Ferramentas" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
-
-                            <!-- *** BOTÃO REPAROS ADICIONADO *** -->
+                            <RadioButton x:Name="BtnDrivers"   GroupName="Menu" Tag="💾" Content="Drivers" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnRepairs"   GroupName="Menu" Tag="🔧" Content="Reparos AIO" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
-
                             <RadioButton x:Name="BtnServices"  GroupName="Menu" Tag="🛡️" Content="Serviços" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                         </StackPanel>
                     </ScrollViewer>
 
+                    <!-- RODAPÉ DO MENU (SOBRE + MONITOR) -->
                     <StackPanel Grid.Row="2">
                         <Separator Background="{StaticResource CardBorder}" Margin="0,10" Opacity="0.5"/>
-                        <RadioButton GroupName="Menu" Tag="⚙️" Content="Sobre o Projeto" Style="{StaticResource NavButtonStyle}" Foreground="{StaticResource TextMuted}"/>
+                        <RadioButton x:Name="BtnTray" GroupName="Menu" Tag="🔔" Content="📡 Monitor RAM (Tray)" 
+                                     Style="{StaticResource NavButtonStyle}" 
+                                     Foreground="{StaticResource TextMuted}"
+                                     Click="NavButton_Click"
+                                     ToolTip="Configurações do ícone na bandeja e monitor de RAM"/>
+                        <!-- BOTÃO "SOBRE O PROJETO" ATUALIZADO COM O CLICK -->
+                        <RadioButton GroupName="Menu" Tag="⚙️" Content="Sobre o Projeto" 
+                                     Style="{StaticResource NavButtonStyle}" 
+                                     Foreground="{StaticResource TextMuted}"
+                                     Click="NavButton_Click"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- CONTEÚDO PRINCIPAL -->
-            <Frame x:Name="MainFrame" Grid.Column="1" NavigationUIVisibility="Hidden" Background="Transparent" Margin="0,32,0,0" Panel.ZIndex="1"/>
+            <!-- ========================================================= -->
+            <!-- CONTEÚDO PRINCIPAL (DIREITA) -->
+            <!-- ========================================================= -->
+            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="Transparent" Margin="0,32,0,0" Panel.ZIndex="1"/>
 
-            <!-- TOASTS -->
+            <!-- TOASTS (Notificações Flutuantes) -->
             <StackPanel x:Name="ToastContainer" 
-                        Grid.Column="1"
+                        Grid.Row="0" Grid.Column="1"
                         VerticalAlignment="Top" 
                         HorizontalAlignment="Right"
                         Margin="0,40,20,0"
                         Panel.ZIndex="9998"
                         Background="{x:Null}"/>
 
-            <!-- MODAL OVERLAY -->
-            <Grid x:Name="OverlayContainer" Grid.Column="0" Grid.ColumnSpan="2" Panel.ZIndex="10000" Visibility="Collapsed" Background="#CC000000"/>
+            <!-- ========================================================= -->
+            <!-- PAINÉIS FLUTUANTES (Sobreposições) -->
+            <!-- ========================================================= -->
+
+            <!-- Central de Notificações (Sino) -->
+            <controls:NotificationCenter x:Name="NotifPanel" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="2" 
+                                         Panel.ZIndex="20000" Visibility="Collapsed"/>
+
+            <!-- Modal Overlay (Diálogos) -->
+            <Grid x:Name="OverlayContainer" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="2" 
+                  Panel.ZIndex="10000" Visibility="Collapsed" Background="#CC000000">
+                <Border x:Name="OverlayConfirm" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" 
+                        BorderThickness="1" CornerRadius="15" Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                        Padding="30" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="CONFIRMAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="TxtConfirmMessage" Text="Deseja continuar?" Foreground="White" FontSize="14" Margin="0,0,0,30" TextAlignment="Center" TextWrapping="Wrap"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Content="NÃO" Click="BtnConfirmNo_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="40" Margin="0,0,15,0"/>
+                            <Button Content="SIM" Click="BtnConfirmYes_Click" Style="{StaticResource GoldButtonStyle}" Width="120" Height="40" FontWeight="Bold"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ========================================================= -->
+            <!-- CONSOLE GLOBAL (Terminal no Rodapé) -->
+            <!-- ========================================================= -->
+            <!-- Fica na Row 1, ocupa toda a largura (ColumnSpan 2), Altura definida no controle (200) -->
+            <controls:GlobalConsole x:Name="GlobalConsolePanel" 
+                                    Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                    Visibility="Collapsed" 
+                                    Height="180" 
+                                    Panel.ZIndex="15000"/>
+
+            <!-- ========================================================= -->
+            <!-- TERMINAL INTERATIVO (LEGACY MODE) -->
+            <!-- ========================================================= -->
+            <controls:InteractiveTerminal x:Name="LegacyTerminalPanel"
+                                          Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                          Visibility="Collapsed"
+                                          Panel.ZIndex="30000"
+                                          Width="950" Height="650"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center">
+                <controls:InteractiveTerminal.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="50" ShadowDepth="10" Opacity="0.8"/>
+                </controls:InteractiveTerminal.Effect>
+            </controls:InteractiveTerminal>
 
         </Grid>
     </Border>

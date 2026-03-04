@@ -139,6 +139,74 @@
                     Tag="⚙️"
                     Click="BtnFlushDns_Click"/>
 
+            <!-- SEÇÃO 3: DIAGNÓSTICO E REPARO DE REDE -->
+            <TextBlock Text="Diagnóstico e Reparo de Rede" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            
+            <!-- BOTÃO DE DIAGNÓSTICO COMPLETO -->
+            <Button x:Name="BtnRunDiagnostics" 
+                    Margin="0,0,0,15" Height="60"
+                    Style="{StaticResource SettingsCardStyle}"
+                    ToolTip="Executa 9 testes avançados para diagnosticar problemas de rede."
+                    Tag="🔍"
+                    Click="BtnRunDiagnostics_Click">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <TextBlock Text="🔍" FontSize="20" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Executar Diagnóstico Completo" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="9 testes avançados para identificar problemas de rede" FontSize="12" Foreground="#A0A0A0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Button>
+
+            <!-- RESULTADOS DO DIAGNÓSTICO -->
+            <Border x:Name="DiagnosticsResultsPanel" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Visibility="Collapsed">
+                <StackPanel Margin="15">
+                    <TextBlock x:Name="DiagnosticsTitle" Text="Resultados do Diagnóstico" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                    
+                    <!-- LISTA DE RESULTADOS -->
+                    <ScrollViewer Height="200" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="DiagnosticsResultsList"/>
+                    </ScrollViewer>
+                    
+                    <!-- BOTÕES DE AÇÃO - SEMPRE VISÍVEIS -->
+                    <StackPanel Orientation="Horizontal" Margin="0,15,0,0" HorizontalAlignment="Right">
+                        <Button x:Name="BtnRepairNetwork" 
+                                Content="🔧 Repair Issues" 
+                                Width="120" Height="35" 
+                                Margin="0,0,10,0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="BtnRepairNetwork_Click"/>
+                        <Button x:Name="BtnOptimizeGaming" 
+                                Content="🎮 Optimize for Gaming" 
+                                Width="150" Height="35"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="BtnOptimizeGaming_Click"/>
+                    </StackPanel>
+                    
+                    <!-- SEPARADOR -->
+                    <Separator Background="{StaticResource CardBorder}" Margin="0,10,0,0"/>
+                    
+                    <!-- INSTRUÇÕES -->
+                    <TextBlock Text="Execute o diagnóstico primeiro, depois use as opções acima para reparar ou otimizar." 
+                               FontSize="11" 
+                               Foreground="{StaticResource TextMuted}" 
+                               Margin="0,10,0,0"
+                               TextWrapping="Wrap"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- STATUS BAR -->
+            <Border x:Name="NetworkStatusBar" Background="#333" CornerRadius="8" Margin="0,15,0,0" Padding="15" Visibility="Collapsed">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="Status:" FontWeight="Bold" Foreground="White" Margin="0,0,10,0"/>
+                        <TextBlock x:Name="NetworkStatusText" Text="Checking..." Foreground="{StaticResource AccentColor}"/>
+                    </StackPanel>
+                    <TextBlock x:Name="NetworkStatusDetails" Text="Running network diagnostics..." FontSize="12" Foreground="#A0A0A0"/>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </Page>

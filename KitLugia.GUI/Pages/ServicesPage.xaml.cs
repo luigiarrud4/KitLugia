@@ -1,81 +1,74 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using KitLugia.Core;
-using KitLugia.GUI.Controls;
-using System.Windows.Forms; // Para OpenFileDialog
+using Microsoft.Win32; // Para OpenFileDialog
+
+// Resolve conflito de nomes
 using Button = System.Windows.Controls.Button;
 using Application = System.Windows.Application;
-using System.IO;
-using System.Collections.Generic;
 
 namespace KitLugia.GUI.Pages
 {
     public partial class ServicesPage : Page
     {
-        // Cache da lista para filtros rápidos
         private List<ServiceInfo> _allServices = new();
+        private int _initialTabIndex = 0;
 
-        public ServicesPage()
+        public ServicesPage(int tabIndex = 0)
         {
             InitializeComponent();
+            _initialTabIndex = tabIndex;
             Loaded += ServicesPage_Loaded;
         }
 
-        private void ServicesPage_Loaded(object sender, RoutedEventArgs e)
+        private async void ServicesPage_Loaded(object sender, RoutedEventArgs e)
         {
-            LoadStartupApps();
-            LoadServices();
+            if (MainTabs != null) MainTabs.SelectedIndex = _initialTabIndex;
+
+            // Carrega os dados iniciais das abas principais
+            await LoadStartupApps();
+            await LoadServices();
+            await LoadScheduledTasks();
         }
 
-        #region --- ABA 1: INICIALIZAÇÃO (STARTUP) ---
+        // =========================================================
+        // ABA 1: INICIALIZAÇÃO (STARTUP)
+        // =========================================================
+        #region Startup Logic
 
-        private async void LoadStartupApps()
+        private async Task LoadStartupApps()
         {
             var apps = await Task.Run(() => StartupManager.GetStartupAppsWithDetails(false));
-
             var sortedApps = apps
                 .OrderByDescending(a => a.Status.ToString() == "Elevated")
                 .ThenByDescending(a => a.Status.ToString() == "Enabled")
                 .ThenBy(a => a.Name)
                 .ToList();
-
             GridStartup.ItemsSource = sortedApps;
         }
 
-        private void BtnRefreshStartup_Click(object sender, RoutedEventArgs e) => LoadStartupApps();
+        private async void BtnRefreshStartup_Click(object sender, RoutedEventArgs e) => await LoadStartupApps();
 
         private async void BtnToggleStartup_Click(object sender, RoutedEventArgs e)
         {
             if (GridStartup.SelectedItem is StartupAppDetails selectedApp)
             {
                 bool willEnable = selectedApp.Status == StartupStatus.Disabled;
-
-                if (selectedApp.Status == StartupStatus.Elevated || (selectedApp.Location.Contains("Agendador") && !willEnable))
-                {
-                    if (Application.Current.MainWindow is MainWindow mw)
-                    {
-                        if (!await mw.ShowConfirmationDialog($"O item '{selectedApp.Name}' é gerenciado pelo Agendador de Tarefas (Admin).\nDeseja alterar seu estado?")) return;
-                    }
-                }
-
                 var result = await Task.Run(() => StartupManager.SetStartupItemState(selectedApp.Name, willEnable));
 
-                if (Application.Current.MainWindow is MainWindow mainWin)
+                if (Application.Current.MainWindow is MainWindow mw)
                 {
                     if (result.Success)
                     {
-                        string action = willEnable ? "Habilitado" : "Desabilitado";
-                        mainWin.ShowSuccess("STARTUP", $"{selectedApp.Name} foi {action} com sucesso.");
+                        mw.ShowSuccess("STARTUP", $"{selectedApp.Name} foi {(willEnable ? "Habilitado" : "Desabilitado")}.");
                         LoadStartupApps();
                     }
-                    else mainWin.ShowError("ERRO", result.Message);
+                    else mw.ShowError("ERRO", result.Message);
                 }
-            }
-            else
-            {
-                if (Application.Current.MainWindow is MainWindow mw) mw.ShowInfo("SELEÇÃO", "Selecione um item na lista.");
             }
         }
 
@@ -85,113 +78,154 @@ namespace KitLugia.GUI.Pages
             {
                 if (Application.Current.MainWindow is MainWindow mw)
                 {
-                    if (!await mw.ShowConfirmationDialog($"TEM CERTEZA? Isso excluirá permanentemente '{selectedApp.Name}' da inicialização.")) return;
-
+                    if (!await mw.ShowConfirmationDialog($"Excluir '{selectedApp.Name}' permanentemente?")) return;
                     var result = await Task.Run(() => StartupManager.RemoveStartupItem(selectedApp.Name));
-
-                    if (result.Success)
-                    {
-                        mw.ShowSuccess("REMOVIDO", result.Message);
-                        LoadStartupApps();
-                    }
+                    if (result.Success) { mw.ShowSuccess("REMOVIDO", result.Message); LoadStartupApps(); }
                     else mw.ShowError("ERRO", result.Message);
                 }
             }
-            else
-            {
-                if (Application.Current.MainWindow is MainWindow mw) mw.ShowInfo("SELEÇÃO", "Selecione um item para remover.");
-            }
         }
 
-        // Lógica do Menu "Adicionar"
+        // --- Adicionar Novo ---
         private void BtnAddStartup_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.ContextMenu != null)
             {
                 btn.ContextMenu.PlacementTarget = btn;
-                btn.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
                 btn.ContextMenu.IsOpen = true;
             }
         }
 
         private string? PickFile()
         {
-            using (var openFileDialog = new OpenFileDialog())
+            // Adicione "Microsoft.Win32." antes de OpenFileDialog
+            var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                openFileDialog.Filter = "Executáveis (*.exe)|*.exe|Todos os arquivos (*.*)|*.*";
-                if (openFileDialog.ShowDialog() == DialogResult.OK) return openFileDialog.FileName;
-            }
-            return null;
+                Filter = "Executáveis (*.exe)|*.exe|Todos (*.*)|*.*"
+            };
+
+            return dialog.ShowDialog() == true ? dialog.FileName : null;
         }
 
         private void MenuAddNormal_Click(object sender, RoutedEventArgs e)
         {
             string? p = PickFile(); if (p == null) return;
-            CreateStandardShortcut(System.IO.Path.GetFileNameWithoutExtension(p), p);
-            if (Application.Current.MainWindow is MainWindow mw) mw.ShowSuccess("PADRÃO", "Adicionado com sucesso.");
+            // Cria atalho padrão via Powershell (Lógica simples)
+            string name = System.IO.Path.GetFileNameWithoutExtension(p);
+            string startupDir = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+            string script = $"$s=(New-Object -COM WScript.Shell).CreateShortcut('{startupDir}\\{name}.lnk');$s.TargetPath='{p}';$s.Save()";
+            SystemUtils.RunExternalProcess("powershell", $"-Command \"{script}\"", hidden: true);
             LoadStartupApps();
         }
 
         private void MenuAddAdmin_Click(object sender, RoutedEventArgs e)
         {
             string? p = PickFile(); if (p == null) return;
-            var res = StartupManager.CreateElevatedStartupTask(System.IO.Path.GetFileNameWithoutExtension(p), p, null);
-            if (Application.Current.MainWindow is MainWindow mw) { if (res.Success) mw.ShowSuccess("ADMIN", res.Message); else mw.ShowError("ERRO", res.Message); }
+            StartupManager.CreateElevatedStartupTask(System.IO.Path.GetFileNameWithoutExtension(p), p, null);
             LoadStartupApps();
         }
 
         private void MenuAddDelayed_Click(object sender, RoutedEventArgs e)
         {
             string? p = PickFile(); if (p == null) return;
-            var res = StartupManager.CreateDelayedStartupTask(System.IO.Path.GetFileNameWithoutExtension(p), p, null);
-            if (Application.Current.MainWindow is MainWindow mw) { if (res.Success) mw.ShowSuccess("ATRASO", res.Message); else mw.ShowError("ERRO", res.Message); }
+            StartupManager.CreateDelayedStartupTask(System.IO.Path.GetFileNameWithoutExtension(p), p, null);
             LoadStartupApps();
         }
 
         private void MenuAddAdminDelayed_Click(object sender, RoutedEventArgs e)
         {
             string? p = PickFile(); if (p == null) return;
-            var res = StartupManager.CreateElevatedDelayedStartupTask(System.IO.Path.GetFileNameWithoutExtension(p), p, null);
-            if (Application.Current.MainWindow is MainWindow mw) { if (res.Success) mw.ShowSuccess("ADMIN + ATRASO", res.Message); else mw.ShowError("ERRO", res.Message); }
+            StartupManager.CreateElevatedDelayedStartupTask(System.IO.Path.GetFileNameWithoutExtension(p), p, null);
             LoadStartupApps();
         }
 
-        private void CreateStandardShortcut(string name, string targetPath)
+        private async void MenuMoveToTurbo_Click(object sender, RoutedEventArgs e)
         {
-            string folder = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Startup);
-            string link = System.IO.Path.Combine(folder, $"{name}.lnk");
-            string script = $"$s=(New-Object -COM WScript.Shell).CreateShortcut('{link}');$s.TargetPath='{targetPath}';$s.Save()";
-            SystemUtils.RunExternalProcess("powershell", $"-Command \"{script}\"", hidden: true);
+            if (GridStartup.SelectedItem is StartupAppDetails selectedApp && Application.Current.MainWindow is MainWindow mw)
+            {
+                if (selectedApp.Location.Contains("Turbo Boot"))
+                {
+                    mw.ShowInfo("TURBO BOOT", "Este aplicativo já está no KitLugia Turbo Boot.");
+                    return;
+                }
+
+                if (!await mw.ShowConfirmationDialog($"Mover '{selectedApp.Name}' para o Turbo Boot (KitLugia)?\n\nIsso utilizará uma inicialização paralela de alta prioridade.")) return;
+
+                var resultAdd = await Task.Run(() => StartupManager.DelegateToKitLugia(selectedApp.Name));
+                if (resultAdd.Success) { mw.ShowSuccess("BEM VINDO AO TURBO BOOT", resultAdd.Message); LoadStartupApps(); }
+                else mw.ShowError("ERRO", resultAdd.Message);
+            }
         }
 
+        private async void MenuConvertToAdmin_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridStartup.SelectedItem is StartupAppDetails selectedApp && Application.Current.MainWindow is MainWindow mw)
+            {
+                if (selectedApp.Status.ToString() == "Elevated")
+                {
+                    mw.ShowInfo("JÁ ELEVADO", "Este aplicativo já está rodando como Administrador.");
+                    return;
+                }
+                
+                StartupManager.ExtractCommandParts(selectedApp.FullCommand, out string? path, out string? args);
+                if (string.IsNullOrEmpty(path)) { mw.ShowError("ERRO", "Caminho inválido ou não pode ser convertido."); return; }
+
+                await Task.Run(() => StartupManager.RemoveStartupItem(selectedApp.Name));
+                var result = await Task.Run(() => StartupManager.CreateElevatedStartupTask(selectedApp.Name, path, args));
+                
+                if (result.Success) { mw.ShowSuccess("ELEVADO COM SUCESSO", result.Message); LoadStartupApps(); }
+                else mw.ShowError("ERRO", result.Message);
+            }
+        }
+
+        private async void MenuConvertToAdminDelayed_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridStartup.SelectedItem is StartupAppDetails selectedApp && Application.Current.MainWindow is MainWindow mw)
+            {
+                StartupManager.ExtractCommandParts(selectedApp.FullCommand, out string? path, out string? args);
+                if (string.IsNullOrEmpty(path)) { mw.ShowError("ERRO", "Caminho inválido ou não pode ser convertido."); return; }
+
+                await Task.Run(() => StartupManager.RemoveStartupItem(selectedApp.Name));
+                var result = await Task.Run(() => StartupManager.CreateElevatedDelayedStartupTask(selectedApp.Name, path, args));
+                
+                if (result.Success) { mw.ShowSuccess("ELEVADO (ATRASO) COM SUCESSO", result.Message); LoadStartupApps(); }
+                else mw.ShowError("ERRO", result.Message);
+            }
+        }
+
+        private async void MenuRestoreNormal_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridStartup.SelectedItem is StartupAppDetails selectedApp && Application.Current.MainWindow is MainWindow mw)
+            {
+                if (selectedApp.Status == StartupStatus.Enabled)
+                {
+                    mw.ShowInfo("RESTAURAR", "Este aplicativo já está na inicialização padrão.");
+                    return;
+                }
+
+                if (!await mw.ShowConfirmationDialog($"Restaurar '{selectedApp.Name}' para a inicialização padrão do Windows?")) return;
+
+                var result = await Task.Run(() => StartupManager.RestoreToNormal(selectedApp.Name));
+                if (result.Success)
+                {
+                    mw.ShowSuccess("SUCESSO", result.Message);
+                    LoadStartupApps();
+                }
+                else mw.ShowError("ERRO", result.Message);
+            }
+        }
         #endregion
 
-        #region --- ABA 2: OTIMIZAÇÃO DE SERVIÇOS ---
+        // =========================================================
+        // ABA 2: OTIMIZAÇÃO DE SERVIÇOS
+        // =========================================================
+        #region Services Logic
 
-        private async void LoadServices()
+        private async Task LoadServices()
         {
-            // 1. SALVA O ITEM SELECIONADO ATUALMENTE
-            string? selectedServiceId = (GridServices.SelectedItem as ServiceInfo)?.Name;
-
-            // 2. Carrega em background
             var services = await Task.Run(() => BackgroundProcessManager.GetAllServices());
             _allServices = services;
-
-            // 3. Aplica filtro
             ApplyServiceFilter();
-
-            // 4. RESTAURA A SELEÇÃO E O SCROLL (FIX PARA A LISTA NÃO PULAR)
-            if (selectedServiceId != null)
-            {
-                var itemToSelect = GridServices.Items.Cast<ServiceInfo>()
-                    .FirstOrDefault(s => s.Name == selectedServiceId);
-
-                if (itemToSelect != null)
-                {
-                    GridServices.SelectedItem = itemToSelect;
-                    GridServices.ScrollIntoView(itemToSelect);
-                }
-            }
         }
 
         private void ApplyServiceFilter()
@@ -201,93 +235,53 @@ namespace KitLugia.GUI.Pages
 
             var filtered = _allServices.Where(s =>
             {
-                bool matchesText = string.IsNullOrEmpty(filter) ||
-                                   s.DisplayName.ToLower().Contains(filter) ||
-                                   s.Name.ToLower().Contains(filter);
-
+                bool matchesText = string.IsNullOrEmpty(filter) || s.DisplayName.ToLower().Contains(filter) || s.Name.ToLower().Contains(filter);
                 bool matchesSafety = showDangerous || s.Safety != ServiceSafetyLevel.Dangerous;
-
                 return matchesText && matchesSafety;
             }).ToList();
 
             GridServices.ItemsSource = filtered;
-
-            if (TxtServiceCount != null)
-                TxtServiceCount.Text = $"{filtered.Count} Serviços";
+            if (TxtServiceCount != null) TxtServiceCount.Text = $"{filtered.Count} Serviços";
         }
 
         private void TxtSearchService_TextChanged(object sender, TextChangedEventArgs e) => ApplyServiceFilter();
         private void ChkShowDangerous_Click(object sender, RoutedEventArgs e) => ApplyServiceFilter();
-        private void BtnRefreshServices_Click(object sender, RoutedEventArgs e) => LoadServices();
+        private async void BtnRefreshServices_Click(object sender, RoutedEventArgs e) => await LoadServices();
 
-        // --- AÇÕES DE PRESET ---
-        private async void RunServicePreset(string presetName, string friendlyName)
+        private async Task RunServicePreset(string presetName, string friendlyName)
         {
             if (Application.Current.MainWindow is MainWindow mw)
             {
-                bool confirmed = await mw.ShowConfirmationDialog(
-                    $"Aplicar otimização '{friendlyName}'?\nIsso irá parar/desativar vários serviços.");
-
-                if (!confirmed) return;
-
-                mw.ShowInfo("AGUARDE", $"Aplicando perfil de serviços: {friendlyName}...");
-
+                if (!await mw.ShowConfirmationDialog($"Aplicar perfil '{friendlyName}'?")) return;
+                mw.ShowInfo("AGUARDE", "Aplicando configurações...");
                 var result = await Task.Run(() => BackgroundProcessManager.ApplyServicePreset(presetName));
-
-                if (result.Success) mw.ShowSuccess("SERVIÇOS", result.Message);
-                else mw.ShowError("ERRO", result.Message);
-
+                mw.ShowSuccess("SERVIÇOS", result.Message);
                 LoadServices();
             }
         }
+
         private void BtnSafeOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("Safe", "Seguro");
         private void BtnGamerOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("Gamer", "Gamer");
         private void BtnRestoreServices_Click(object sender, RoutedEventArgs e) => RunServicePreset("Restore", "Padrão");
 
-        // --- AÇÕES INDIVIDUAIS ---
-        private async void ChangeServiceState(string mode)
+        // Menu de Contexto
+        private async Task ChangeServiceState(string mode)
         {
             if (GridServices.SelectedItem is ServiceInfo svc && Application.Current.MainWindow is MainWindow mw)
             {
-                // Proteção para Serviços Críticos
-                if (svc.Safety == ServiceSafetyLevel.Dangerous)
+                if (svc.Safety == ServiceSafetyLevel.Dangerous && mode == "disabled")
                 {
-                    // Lista de serviços intocáveis (Kernel/Security)
-                    var hardlockedServices = new HashSet<string> { "Schedule", "MpsSvc", "Audiosrv", "RpcSs", "ProfSvc", "EventLog", "BFE", "Dhcp", "Dnscache" };
-                    if (hardlockedServices.Contains(svc.Name))
-                    {
-                        mw.ShowError("BLOQUEADO", $"O Windows protege o serviço '{svc.DisplayName}'.\nEle não pode ser modificado.");
-                        return;
-                    }
-
-                    if (mode == "disabled")
-                    {
-                        if (!await mw.ShowConfirmationDialog($"PERIGO: '{svc.DisplayName}' é um serviço CRÍTICO.\nDesativá-lo pode causar falhas graves. Tem certeza?")) return;
-                    }
+                    if (!await mw.ShowConfirmationDialog($"PERIGO: '{svc.DisplayName}' é crítico. Desativar?")) return;
                 }
 
-                if (mode == "default")
-                {
-                    mw.ShowInfo("AGUARDE", $"Restaurando '{svc.DisplayName}'...");
-                    var result = await Task.Run(() => BackgroundProcessManager.ResetServiceToDefault(svc.Name));
-                    if (result.Success) mw.ShowSuccess("RESTAURADO", result.Message); else mw.ShowError("ERRO", result.Message);
-                }
-                else
-                {
-                    string modeUi = mode == "auto" ? "Automático" : (mode == "demand" ? "Manual" : "Desativado");
-                    mw.ShowInfo("AGUARDE", $"Configurando '{svc.DisplayName}' para {modeUi}...");
+                mw.ShowInfo("AGUARDE", $"Configurando '{svc.DisplayName}'...");
 
-                    var result = await Task.Run(() => BackgroundProcessManager.ToggleServiceState(svc.Name, mode));
+                var result = mode == "default"
+                    ? await Task.Run(() => BackgroundProcessManager.ResetServiceToDefault(svc.Name))
+                    : await Task.Run(() => BackgroundProcessManager.ToggleServiceState(svc.Name, mode));
 
-                    if (result.Success) mw.ShowSuccess("SUCESSO", result.Message);
-                    else
-                    {
-                        // Mensagem de erro mais bonita
-                        string msg = result.Message;
-                        if (msg.Contains("5") || msg.Contains("Acesso negado")) msg = "Acesso Negado pelo Windows (Serviço Protegido).";
-                        mw.ShowError("ERRO", msg);
-                    }
-                }
+                if (result.Success) mw.ShowSuccess("SUCESSO", result.Message);
+                else mw.ShowError("ERRO", result.Message);
 
                 LoadServices();
             }
@@ -297,7 +291,102 @@ namespace KitLugia.GUI.Pages
         private void MenuSvcManual_Click(object sender, RoutedEventArgs e) => ChangeServiceState("demand");
         private void MenuSvcDisabled_Click(object sender, RoutedEventArgs e) => ChangeServiceState("disabled");
         private void MenuSvcDefault_Click(object sender, RoutedEventArgs e) => ChangeServiceState("default");
+        #endregion
 
+        // =========================================================
+        // ABA 3: TAREFAS AGENDADAS (NOVO)
+        // =========================================================
+        #region Scheduled Tasks Logic
+
+        private async Task LoadScheduledTasks()
+        {
+            var tasks = await Task.Run(() => BackgroundProcessManager.GetScheduledTasksStatus());
+            GridTasks.ItemsSource = tasks;
+        }
+
+        private async void BtnToggleTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridTasks.SelectedItem is ScheduledTaskInfo task && Application.Current.MainWindow is MainWindow mw)
+            {
+                bool newState = !task.IsEnabled;
+                var result = await Task.Run(() => BackgroundProcessManager.ToggleTaskState(task.Path, newState));
+
+                if (result.Success)
+                {
+                    mw.ShowSuccess("TAREFA", result.Message);
+                    LoadScheduledTasks();
+                }
+                else mw.ShowError("ERRO", result.Message);
+            }
+        }
+
+        private async void BtnDisableAllTasks_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+            {
+                if (!await mw.ShowConfirmationDialog("Isso desativará TODAS as tarefas de telemetria listadas.\nDeseja continuar?")) return;
+
+                var result = await Task.Run(() => BackgroundProcessManager.DisableTelemetryTasks());
+                mw.ShowSuccess("TELEMETRIA", result.Message);
+                LoadScheduledTasks();
+            }
+        }
+        #endregion
+
+        // =========================================================
+        // ABA 4: ANÁLISE DE BOOT (NOVO)
+        // =========================================================
+        #region Boot Analysis Logic
+
+        private async void BtnAnalyzeBoot_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+            {
+                TxtBootTime.Text = "Analisando...";
+                mw.ShowInfo("AGUARDE", "Lendo logs de eventos do sistema...");
+
+                try
+                {
+                    var result = await Task.Run(() => BootOptimizerManager.AnalyzeBootPerformance());
+
+                    if (!string.IsNullOrEmpty(result.ServiceStatusMessage))
+                    {
+                        mw.ShowError("AVISO", result.ServiceStatusMessage);
+                        TxtBootTime.Text = "N/A";
+                        return;
+                    }
+
+                    if (result.TotalTimeEvent != null)
+                    {
+                        double seconds = result.TotalTimeEvent.TimeTaken / 1000.0;
+                        TxtBootTime.Text = $"{seconds:F2} segundos";
+                        TxtBootDate.Text = $"Data: {result.TotalTimeEvent.TimeOfEvent}";
+                    }
+                    else
+                    {
+                        TxtBootTime.Text = "Sem dados recentes";
+                    }
+
+                    // Junta as duas listas para exibir na tabela
+                    var combinedList = new List<PerformanceEvent>();
+                    combinedList.AddRange(result.SlowStartupItems);
+                    combinedList.AddRange(result.HighImpactApps);
+
+                    GridBootItems.ItemsSource = combinedList;
+
+                    if (combinedList.Count == 0)
+                        mw.ShowSuccess("ÓTIMO", "Nenhum atraso significativo (>1s) encontrado no último boot.");
+                    else
+                        mw.ShowInfo("ANÁLISE", $"Encontrados {combinedList.Count} itens que impactaram o boot.");
+
+                }
+                catch (Exception ex)
+                {
+                    mw.ShowError("ERRO", ex.Message);
+                    TxtBootTime.Text = "Erro";
+                }
+            }
+        }
         #endregion
     }
 }

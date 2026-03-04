@@ -1,154 +1,425 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
+using KitLugia.Core;
 using KitLugia.GUI.Controls;
 using KitLugia.GUI.Pages;
+using KitLugia.GUI.Services;
+
+// --- CORREÇÃO DOS ERROS DE AMBIGUIDADE ---
+// Estas linhas forçam o código a usar os componentes do WPF
 using RadioButton = System.Windows.Controls.RadioButton;
 using Application = System.Windows.Application;
 
 namespace KitLugia.GUI
 {
-    public class SearchAction
-    {
-        public string Title { get; set; } = "";
-        public string Description { get; set; } = "";
-        public string PageTag { get; set; } = "";
-        public string Keywords { get; set; } = "";
-    }
-
     public partial class MainWindow : Window
     {
         private const int MaxVisibleToasts = 6;
         private Dictionary<string, LugiaToast> _activeToasts = new Dictionary<string, LugiaToast>();
-        private List<SearchAction> _allSearchActions = new List<SearchAction>();
+        private TaskCompletionSource<bool>? _confirmCompletionSource;
+
+        // Tray Icon RAM Monitor
+        private TrayIconService? _trayService;
+        public TrayIconService? TrayService => _trayService;
+
+        // Timer para o Debounce da pesquisa
+        private DispatcherTimer _searchDebounceTimer;
+
+        // Single-instance show window signaling
+        private System.Threading.EventWaitHandle? _showWindowEvent;
+        private System.Threading.Thread? _showWindowMonitor;
 
         public MainWindow()
         {
             InitializeComponent();
-            InitializeSearchIndex();
+
+            // Inicializa a Engine de Busca
+            SearchEngine.Initialize();
+
+            // Configura o timer de pesquisa (300ms)
+            _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _searchDebounceTimer.Tick += SearchDebounce_Tick;
+
+            // Inicia na Dashboard
             MainFrame.Navigate(new DashboardPage());
+            if (BtnDashboard != null) BtnDashboard.IsChecked = true;
+
+            // Conecta o Logger do Core ao Console da GUI
+            KitLugia.Core.Logger.OnLogReceived += (msg) => ConsoleManager.WriteLine(msg);
+
+            // Conecta o contador de notificações
+            NotificationHistoryManager.OnCountChanged += UpdateNotificationBadge;
+
+            // Configura o fechamento do painel de console (Rodapé)
+            if (GlobalConsolePanel != null)
+                GlobalConsolePanel.RequestClose += (s, e) => { GlobalConsolePanel.Visibility = Visibility.Collapsed; };
+
+            // --- CORREÇÃO: Configura o fechamento do Terminal Legacy (Tela Cheia) ---
+            if (LegacyTerminalPanel != null)
+                LegacyTerminalPanel.RequestClose += (s, e) => { LegacyTerminalPanel.Visibility = Visibility.Collapsed; };
+
+            // --- TRAY ICON: Inicializa o Monitor de RAM ---
+            _trayService = new TrayIconService();
+            _trayService.OnOpenMainWindow += () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    Show();
+                    WindowState = WindowState.Normal;
+                    Activate();
+                    Focus();
+                });
+            };
+            _trayService.OnOpenSettings += () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    Show();
+                    WindowState = WindowState.Normal;
+                    Activate();
+                    Focus();
+                    NavigateToPage("🔔");
+                });
+            };
+            _trayService.Initialize();
+
+            // --- AUTO-START: Garante que o app inicie com o Windows se o Tray estiver ativo ---
+            if (TrayIconService.IsTrayEnabledStatic())
+            {
+                TrayIconService.SetAutoStart(true);
+            }
+
+            // --- NAMED EVENT: Permite que uma segunda instância sinalize para mostrar a janela ---
+            _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "KitLugia_ShowWindow");
+            _showWindowMonitor = new System.Threading.Thread(() =>
+            {
+                while (true)
+                {
+                    _showWindowEvent.WaitOne();
+                    Dispatcher.Invoke(() =>
+                    {
+                        Show();
+                        WindowState = WindowState.Normal;
+                        Activate();
+                        Focus();
+                    });
+                }
+            }) { IsBackground = true, Name = "ShowWindowMonitor" };
+            _showWindowMonitor.Start();
         }
 
-        #region Search Logic
-        private void InitializeSearchIndex()
+        // =========================================================
+        // MÉTODO PÚBLICO PARA ABRIR O TERMINAL LEGACY
+        // (Chamado pela Dashboard e pela página Sobre)
+        // =========================================================
+        public void OpenLegacyTerminal()
         {
-            _allSearchActions = new List<SearchAction>
+            if (LegacyTerminalPanel != null)
             {
-                new SearchAction { Title = "Dashboard", PageTag = "🏠", Description = "Visão geral." },
-                new SearchAction { Title = "Modo Jogo", PageTag = "⚡", Description = "Prioridade GPU.", Keywords = "game fps" },
-                new SearchAction { Title = "MPO Fix", PageTag = "⚡", Description = "Correção flicker.", Keywords = "nvidia amd" },
-                new SearchAction { Title = "Central AIO", PageTag = "🔧", Description = "Soluções de reparo.", Keywords = "fix repair" },
-                new SearchAction { Title = "Windows Update", PageTag = "🔧", Description = "Reparar erros update.", Keywords = "update erro" },
-                new SearchAction { Title = "Explorer Fix", PageTag = "🔧", Description = "Reiniciar Explorer.", Keywords = "taskbar" },
-                new SearchAction { Title = "Bloatware", PageTag = "📱", Description = "Remover apps.", Keywords = "xbox" },
-                new SearchAction { Title = "Limpeza", PageTag = "💿", Description = "Lixo e Temp.", Keywords = "clean" },
-                new SearchAction { Title = "DNS", PageTag = "🌐", Description = "Mudar DNS.", Keywords = "ping net" },
-                new SearchAction { Title = "Serviços", PageTag = "🛡️", Description = "Otimizar serviços.", Keywords = "services" }
-            };
+                LegacyTerminalPanel.Visibility = Visibility.Visible;
+                // Opcional: Focar no input se o controle suportar
+            }
         }
+
+        #region LIVE SEARCH (PESQUISA GLOBAL)
 
         private void TxtGlobalSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            string query = TxtGlobalSearch.Text.Trim().ToLower();
-            if (string.IsNullOrEmpty(query)) { SearchPopup.IsOpen = false; return; }
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
 
-            var results = _allSearchActions.Where(x => x.Title.ToLower().Contains(query) || x.Keywords.ToLower().Contains(query)).Take(8).ToList();
-            LstSearchResults.ItemsSource = results;
-            SearchPopup.IsOpen = results.Any();
+        private void SearchDebounce_Tick(object? sender, EventArgs e)
+        {
+            _searchDebounceTimer.Stop();
+            PerformLiveSearch(TxtGlobalSearch.Text);
+        }
+
+        private void PerformLiveSearch(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                if (SearchPopup != null) SearchPopup.IsOpen = false;
+                return;
+            }
+
+            if (MainFrame.Content is GlobalSearchPage searchPage)
+            {
+                searchPage.UpdateSearch(query);
+            }
+            else
+            {
+                UncheckAllNavButtons();
+                MainFrame.Navigate(new GlobalSearchPage(query));
+            }
         }
 
         private void LstSearchResults_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (LstSearchResults.SelectedItem is SearchAction action) { NavigateToPage(action.PageTag); TxtGlobalSearch.Text = ""; SearchPopup.IsOpen = false; }
+            if (LstSearchResults.SelectedItem is GlobalSearchResult result)
+            {
+                TxtGlobalSearch.Text = "";
+                if (SearchPopup != null) SearchPopup.IsOpen = false;
+            }
         }
         #endregion
 
-        #region Navigation
-        private void NavButton_Click(object sender, RoutedEventArgs e) { if (sender is RadioButton btn) NavigateToPage(btn.Tag?.ToString()); }
+        #region SISTEMA DE NAVEGAÇÃO
+
+        public bool IsNavigationLocked { get; set; } = false;
+
+        private void NavButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsNavigationLocked)
+            {
+                if (sender is RadioButton rb)
+                {
+                    rb.IsChecked = false; // Desmarca o botão que o usuário tentou clicar
+                    // Tenta remarcar o botão da página atual
+                    UpdateNavButtonsSelection();
+                }
+                ShowError("NAVEGAÇÃO BLOQUEADA", "Uma operação crítica de disco está em curso. Aguarde a conclusão para trocar de página.");
+                return;
+            }
+
+            if (sender is RadioButton btn)
+            {
+                if (TxtGlobalSearch != null) TxtGlobalSearch.Text = "";
+                NavigateToPage(btn.Tag?.ToString(), btn);
+            }
+        }
+
+        private void UpdateNavButtonsSelection()
+        {
+            if (MainFrame.Content is DashboardPage) BtnDashboard.IsChecked = true;
+            else if (MainFrame.Content is TweaksPage) BtnTweaks.IsChecked = true;
+            else if (MainFrame.Content is ScreenPage) BtnScreen.IsChecked = true;
+            else if (MainFrame.Content is BloatwarePage) BtnApps.IsChecked = true;
+            else if (MainFrame.Content is CleanupPage) BtnStorage.IsChecked = true;
+            else if (MainFrame.Content is NetworkPage) BtnNetwork.IsChecked = true;
+            else if (MainFrame.Content is GamesPage) BtnGames.IsChecked = true;
+            else if (MainFrame.Content is ServicesPage) BtnServices.IsChecked = true;
+            else if (MainFrame.Content is RepairsPage) BtnRepairs.IsChecked = true;
+            else if (MainFrame.Content is DriversPage) BtnDrivers.IsChecked = true;
+            else if (MainFrame.Content is PartitionsPage) BtnPartitions.IsChecked = true;
+            else if (MainFrame.Content is TraySettingsPage) { if (BtnTray != null) BtnTray.IsChecked = true; }
+        }
+
+        private void UncheckAllNavButtons()
+        {
+            if (BtnDashboard != null) BtnDashboard.IsChecked = false;
+            if (BtnTweaks != null) BtnTweaks.IsChecked = false;
+            if (BtnScreen != null) BtnScreen.IsChecked = false;
+            if (BtnApps != null) BtnApps.IsChecked = false;
+            if (BtnStorage != null) BtnStorage.IsChecked = false;
+            if (BtnNetwork != null) BtnNetwork.IsChecked = false;
+            if (BtnGames != null) BtnGames.IsChecked = false;
+            if (BtnServices != null) BtnServices.IsChecked = false;
+            if (BtnRepairs != null) BtnRepairs.IsChecked = false;
+            if (BtnDrivers != null) BtnDrivers.IsChecked = false;
+            if (BtnPartitions != null) BtnPartitions.IsChecked = false;
+
+            // CORREÇÃO: Garante que o botão de segurança no topo também seja desmarcado
+            if (BtnSecurity != null) BtnSecurity.IsChecked = false;
+            if (BtnIntegrity != null) BtnIntegrity.IsChecked = false;
+            if (BtnTray != null) BtnTray.IsChecked = false;
+        }
 
         public void NavigateToPage(string? pageTag, object? senderButton = null)
         {
             if (pageTag == null) return;
-            if (senderButton == null)
-            {
-                BtnDashboard.IsChecked = false; BtnTweaks.IsChecked = false; BtnApps.IsChecked = false;
-                BtnStorage.IsChecked = false; BtnNetwork.IsChecked = false; BtnGames.IsChecked = false;
-                BtnTools.IsChecked = false; BtnServices.IsChecked = false; BtnRepairs.IsChecked = false;
 
-                switch (pageTag)
+            string baseTag = pageTag;
+            int tabIndex = 0;
+
+            if (pageTag.Contains(":"))
+            {
+                var parts = pageTag.Split(':');
+                baseTag = parts[0];
+                if (parts.Length > 1) int.TryParse(parts[1], out tabIndex);
+            }
+
+            // SEGURANÇA GERAL: Bloqueia navegação se houver operação crítica
+            if (IsNavigationLocked)
+            {
+                ShowError("BLOQUEADO", "Aguarde a operação de disco finalizar.");
+                return;
+            }
+
+            // SEGURANÇA WINBOOT: Pergunta se deseja sair se estiver na página de Winboot
+            if (MainFrame.Content is WinbootPage winPage)
+            {
+                var result = System.Windows.MessageBox.Show("Tem certeza que deseja sair do Winboot? Suas configurações de partição em andamento podem ser perdidas.", 
+                                           "KitLugia - Confirmação", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.No)
                 {
-                    case "🏠": BtnDashboard.IsChecked = true; break;
-                    case "⚡": BtnTweaks.IsChecked = true; break;
-                    case "📱": BtnApps.IsChecked = true; break;
-                    case "💿": BtnStorage.IsChecked = true; break;
-                    case "🌐": BtnNetwork.IsChecked = true; break;
-                    case "🎮": BtnGames.IsChecked = true; break;
-                    case "🛠️": BtnTools.IsChecked = true; break;
-                    case "🛡️": BtnServices.IsChecked = true; break;
-                    case "🔧": BtnRepairs.IsChecked = true; break;
+                    // Restaura o botão de navegação correto (se possível) ou apenas cancela
+                    if (senderButton is RadioButton rb) rb.IsChecked = false;
+                    return;
                 }
             }
 
-            switch (pageTag)
+
+
+            if (senderButton == null)
             {
-                case "🏠": MainFrame.Navigate(new DashboardPage()); break;
-                case "⚡": MainFrame.Navigate(new TweaksPage()); break;
-                case "📱": MainFrame.Navigate(new BloatwarePage()); break;
-                case "💿": MainFrame.Navigate(new CleanupPage()); break;
-                case "🌐": MainFrame.Navigate(new NetworkPage()); break;
-                case "🎮": MainFrame.Navigate(new GamesPage()); break;
-                case "🛠️": MainFrame.Navigate(new ToolsPage()); break;
-                case "🛡️": MainFrame.Navigate(new ServicesPage()); break;
-                case "🔧": MainFrame.Navigate(new RepairsPage()); break;
-                default: ShowInfo("EM BREVE", "Página em desenvolvimento."); break;
+                UncheckAllNavButtons();
+                switch (baseTag)
+                {
+                    case "🏠": if (BtnDashboard != null) BtnDashboard.IsChecked = true; break;
+                    case "⚡": if (BtnTweaks != null) BtnTweaks.IsChecked = true; break;
+                    case "🖥️": if (BtnScreen != null) BtnScreen.IsChecked = true; break;
+                    case "📱": if (BtnApps != null) BtnApps.IsChecked = true; break;
+                    case "💿": if (BtnStorage != null) BtnStorage.IsChecked = true; break;
+                    case "🌐": if (BtnNetwork != null) BtnNetwork.IsChecked = true; break;
+                    case "🎮": if (BtnGames != null) BtnGames.IsChecked = true; break;
+                    case "🛡️": if (BtnServices != null) BtnServices.IsChecked = true; break;
+                    case "🔧": if (BtnRepairs != null) BtnRepairs.IsChecked = true; break;
+                    case "💾": if (BtnDrivers != null) BtnDrivers.IsChecked = true; break;
+                    case "💽": if (BtnPartitions != null) BtnPartitions.IsChecked = true; break;
+                    case "🛡️Scan": if (BtnSecurity != null) BtnSecurity.IsChecked = true; break;
+                case "🔐": if (BtnIntegrity != null) BtnIntegrity.IsChecked = true; break;
+                }
+            }
+
+            Page? newPage = baseTag switch
+            {
+                "🏠" => new DashboardPage(),
+                "⚡" => new TweaksPage(),
+                "🖥️" => new ScreenPage(),
+                "📱" => new BloatwarePage(),
+                "💿" => new CleanupPage(),
+                "🌐" => new NetworkPage(),
+                "🎮" => new GamesPage(),
+                "🛠️" => new ToolsPage(tabIndex),
+                "🚀" => new AdvancedToolsPage(),
+                "🛡️" => new ServicesPage(tabIndex),
+                "🔧" => new RepairsPage(),
+                "💾" => new DriversPage(),
+                "💽" => new PartitionsPage(),
+                "🛡️Scan" => new IntegrityPage(),
+                "🔐" => new SecurityPage(),
+                "⚙️" => new TweaksPage(), // Otimização integrada em Tweaks
+                "🔒" => new PrivacyPage(),
+                "🔑" => new ActivationPage(),
+                "🔔" => new TraySettingsPage(),
+                _ => null
+            };
+
+            if (newPage != null)
+            {
+                MainFrame.Navigate(newPage);
+            }
+            else
+            {
+                ShowInfo("EM BREVE", "Página em desenvolvimento.");
             }
         }
 
-        private void BtnClose_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            // Minimiza para a bandeja em vez de fechar
+            Hide();
+            _trayService?.ShowMinimizedNotification();
+        }
         private void BtnMaximize_Click(object sender, RoutedEventArgs e) => WindowState = (WindowState == WindowState.Normal) ? WindowState.Maximized : WindowState.Normal;
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
         #endregion
 
-        #region Notifications Logic (Corrigida)
+        #region EVENTOS DO HEADER (Console e Notificações)
+
+        private void BtnNotifications_Click(object sender, RoutedEventArgs e)
+        {
+            if (NotifPanel != null) NotifPanel.Toggle();
+        }
+
+        private void BtnConsole_Click(object sender, RoutedEventArgs e)
+        {
+            if (GlobalConsolePanel != null)
+            {
+                GlobalConsolePanel.Visibility = (GlobalConsolePanel.Visibility == Visibility.Visible)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+            }
+        }
+
+        #endregion
+
+        #region CONSOLE E NOTIFICAÇÕES (Lógica)
+
+        private void UpdateNotificationBadge()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                int count = NotificationHistoryManager.History.Count;
+                if (BtnNotifications.Template.FindName("Badge", BtnNotifications) is Border badge &&
+                    BtnNotifications.Template.FindName("TxtBadgeCount", BtnNotifications) is TextBlock txtCount)
+                {
+                    if (count > 0)
+                    {
+                        badge.Visibility = Visibility.Visible;
+                        txtCount.Text = count > 99 ? "99+" : count.ToString();
+                    }
+                    else
+                    {
+                        badge.Visibility = Visibility.Collapsed;
+                    }
+                }
+            });
+        }
+        #endregion
+
+        #region OVERLAYS E TOASTS (Helpers)
 
         public async Task<bool> ShowConfirmationDialog(string message)
         {
-            var overlay = new LugiaConfirmationOverlay(message);
-            OverlayContainer.Children.Clear();
-            OverlayContainer.Children.Add(overlay);
+            TxtConfirmMessage.Text = message;
             OverlayContainer.Visibility = Visibility.Visible;
-            bool result = await overlay.WaitForUserSelection();
+            OverlayConfirm.Visibility = Visibility.Visible;
+            _confirmCompletionSource = new TaskCompletionSource<bool>();
+            return await _confirmCompletionSource.Task;
+        }
+
+        private void BtnConfirmYes_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayConfirm.Visibility = Visibility.Collapsed;
             OverlayContainer.Visibility = Visibility.Collapsed;
-            OverlayContainer.Children.Clear();
-            return result;
+            _confirmCompletionSource?.SetResult(true);
+        }
+
+        private void BtnConfirmNo_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayConfirm.Visibility = Visibility.Collapsed;
+            OverlayContainer.Visibility = Visibility.Collapsed;
+            _confirmCompletionSource?.SetResult(false);
         }
 
         public void ShowSuccess(string title, string message) => ShowNotification(title, message, NotificationType.Success);
         public void ShowError(string title, string message) => ShowNotification(title, message, NotificationType.Error);
         public void ShowInfo(string title, string message) => ShowNotification(title, message, NotificationType.Info);
 
-        // Helper para definir valor de importância (Maior número = Mais ao topo)
         private int GetPriorityValue(NotificationType type)
         {
-            return type switch
-            {
-                NotificationType.Error => 3,   // Topo absoluto
-                NotificationType.Info => 2,    // Meio (Amarelo)
-                NotificationType.Success => 1, // Base (Verde)
-                _ => 0
-            };
+            return type switch { NotificationType.Error => 3, NotificationType.Info => 2, NotificationType.Success => 1, _ => 0 };
         }
 
         private void ShowNotification(string title, string message, NotificationType type)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
+                ConsoleManager.WriteLine($"NOTIFICAÇÃO: [{title}] {message}");
+
+                if (title != "AGUARDE" && title != "PROCESSANDO")
+                    NotificationHistoryManager.Add(title, message, type);
+
                 string searchId = (type == NotificationType.Info) ? "GENERIC_INFO" : $"{type}|{title}|{message}";
 
-                // Se já existe, atualiza mas mantendo posição lógica
                 if (_activeToasts.TryGetValue(searchId, out LugiaToast? existingToast))
                 {
                     if (type == NotificationType.Info) existingToast.UpdateMessage(message);
@@ -156,49 +427,17 @@ namespace KitLugia.GUI
                     return;
                 }
 
-                // Cria novo Toast
                 var toast = new LugiaToast();
                 toast.SetContent(title, message, type);
                 _activeToasts[searchId] = toast;
 
-                // Limita quantidade (remove o mais antigo de menor prioridade visual, que está no final da lista)
                 if (ToastContainer.Children.Count >= MaxVisibleToasts)
                 {
                     if (ToastContainer.Children[ToastContainer.Children.Count - 1] is LugiaToast last) last.Dismiss();
                 }
 
-                // --- ALGORITMO DE INSERÇÃO ORDENADA (Top = Index 0) ---
-                // Queremos: Index 0 -> Vermelho, Index X -> Amarelo, Index Y -> Verde.
-                int newPriority = GetPriorityValue(type);
-                int insertIndex = 0;
-                bool inserted = false;
+                ToastContainer.Children.Insert(0, toast);
 
-                foreach (UIElement child in ToastContainer.Children)
-                {
-                    if (child is LugiaToast childToast)
-                    {
-                        int childPriority = GetPriorityValue(childToast.ToastType);
-
-                        // Se a nova notificação for mais importante que a atual da lista, insere aqui.
-                        // (Isso empurra a atual e as próximas para baixo).
-                        // Se for igual, continuamos descendo para que a NOVA fique ACIMA das velhas de mesma cor (Stack normal).
-                        if (newPriority > childPriority)
-                        {
-                            ToastContainer.Children.Insert(insertIndex, toast);
-                            inserted = true;
-                            break;
-                        }
-                    }
-                    insertIndex++;
-                }
-
-                // Se não inseriu ainda (significa que é a menor prioridade ou a lista estava vazia), coloca no fim.
-                if (!inserted)
-                {
-                    ToastContainer.Children.Add(toast);
-                }
-
-                // Callback de Limpeza de Memória
                 void OnToastDismissed(LugiaToast t)
                 {
                     t.Dismissed -= OnToastDismissed;

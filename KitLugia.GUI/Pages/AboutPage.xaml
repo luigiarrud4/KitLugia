@@ -1,0 +1,90 @@
+﻿<Page x:Class="KitLugia.GUI.Pages.AboutPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      Title="Sobre o Projeto">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="800" HorizontalAlignment="Left">
+
+            <!-- TÍTULO -->
+            <TextBlock Text="Sobre o Projeto" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="White"/>
+
+            <!-- LOGO / BANNER -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="12" Padding="30" Margin="0,0,0,30">
+                <Border.Effect>
+                    <DropShadowEffect Color="#FFD700" BlurRadius="20" ShadowDepth="0" Opacity="0.1"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Emoji como Logo -->
+                    <TextBlock Text="🐲" FontSize="60" VerticalAlignment="Center" Margin="0,0,30,0"/>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="KIT LUGIA" FontSize="28" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Gold Edition (v2.0)" FontSize="16" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0"/>
+                        <TextBlock Text="Otimização de sistema, rede e hardware para alta performance." Foreground="#AAA" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- CRÉDITOS -->
+            <TextBlock Text="Informações" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+            <Border Background="#1A1A1A" CornerRadius="8" Padding="20" BorderBrush="#333" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Desenvolvido por: Equipe Lugia" Foreground="#DDD" FontSize="14"/>
+                    <TextBlock Text="Baseado na v18 (RelMon) e v20 (Final)" Foreground="#888" Margin="0,5,0,0"/>
+                    <TextBlock Text="Licença: Uso Livre / Open Source" Foreground="#888" Margin="0,5,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ÁREA LEGACY (MODO CLÁSSICO) -->
+            <TextBlock Text="Modo Clássico" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,10"/>
+            <Border Background="#15000000" BorderBrush="#33C42B1C" BorderThickness="1" CornerRadius="8" Padding="20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Acessar Versão Console (Legacy)" FontWeight="Bold" Foreground="#FF6F61" FontSize="15"/>
+                        <TextBlock Text="Interface antiga baseada em texto (Terminal)." Foreground="#999" FontSize="12" Margin="0,5,0,0"/>
+                        <TextBlock Text="Requer o arquivo 'KitLugia_Legacy.exe' na pasta do programa." Foreground="#666" FontSize="11" Margin="0,2,0,0" FontStyle="Italic"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1" Content="INICIAR LEGACY" Click="BtnLegacy_Click" 
+                            Width="140" Height="40" Cursor="Hand" FontWeight="Bold">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#333" BorderBrush="#FF6F61" BorderThickness="1" CornerRadius="4">
+                                    <TextBlock Text="{TemplateBinding Content}" Foreground="#FF6F61" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#FF6F61"/>
+                                        <Setter Property="Foreground" Value="Black"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- LINKS DE RODAPÉ -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,40,0,0">
+                <TextBlock Text="GitHub" Foreground="{StaticResource AccentColor}" Cursor="Hand" TextDecorations="Underline" Margin="10"/>
+                <TextBlock Text="•" Foreground="#555" Margin="10"/>
+                <TextBlock Text="Discord" Foreground="{StaticResource AccentColor}" Cursor="Hand" TextDecorations="Underline" Margin="10"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>
