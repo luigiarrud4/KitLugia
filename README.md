@@ -263,7 +263,7 @@ dotnet publish KitLugia.GUI -c Release -r win-x64 --self-contained true -p:Publi
 
 ---
 
-## 📊 **Requisitos**
+## 📊 **Requisitos** (ilustrativo funciona até com pentium so precisa mesmo do windows 11)
 
 ### 💻 **Mínimos**
 ```
@@ -274,7 +274,7 @@ Armazenamento: 2 GB de espaço livre
 Placa de Vídeo: DirectX 12 compatible
 ```
 
-### 🚀 **Recomendados** (ilustrativo funciona até com pentium so precisa mesmo do windows 11)
+### 🚀 **Recomendados** 
 ```
 Sistema Operacional: Windows 11 24H2
 Processador: Intel i7 / AMD Ryzen 7 ou superior
