@@ -244,7 +244,7 @@ dotnet publish KitLugia.GUI -c Release -r win-x64 --self-contained true -p:Publi
 2. **Vá** para as página **"Desempenho"** ative todas as opções do começo so não ative as ultimas **(SLIDE)**
 3. **Ative** o **"Game Boost"** na parte do **"Monitor Tray"** e ative as opções: **Iniciar com o windows, Game boost, Icone de bandeja**
 4. **Inicie** seu jogo favorito
-5. **Sinta** a diferença 10x! 🚀 **A maior diferença é na velocidade de loading dos jogos exemplo minecraft!**
+5. **Sinta** a diferença 10x! 🚀 **A maior diferença é na velocidade de loading dos jogos exemplo minecraft/CS2!**
 ![Tutorial](https://github.com/luigiarrud4/KitLugia/blob/349e5d21a73e894683fcdfdf82416b9e42ca8a9e/KitLugia.GUI/0304.gif) 
 
 ### 💼 **Para Profissionais**
