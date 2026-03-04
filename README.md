@@ -1,4 +1,5 @@
-# 🏆 KitLugia V2 - O Otimizador Windows Mais Completo do Mundo
+# 🏆 KitLugia V2 - O Otimizador Windows Mais Completo
+## ainda esta em desenvolvimento inclui diversos apps todos em um lugar só facilitando o uso
 
 <div align="center">
 
