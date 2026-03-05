@@ -153,7 +153,7 @@ Win32Api.SetProcessPagePriority(proc.Handle, 5);
 
 ### 📊 **Resultados Comprovados:**
 - ⚡ **Shader Loading**: 10x mais rápido (2s → 0.2s)
-- 🎮 **FPS Increase**: 15-30% em jogos pesados
+- 🎮 **FPS Increase**: 15-30% em jogos pesados ou competitivos
 - 📥 **Downloads**: 10x mais rápidos
 - 🚫 **Stuttering**: Praticamente zero
 - 🔄 **System Responsiveness**: 40% mais ágil
