@@ -120,7 +120,7 @@ namespace KitLugia.GUI.Services
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
                 if (key != null)
                 {
-                    if (enable) key.SetValue("KitLugia", $"\"{path}\" --minimized");
+                    if (enable) key.SetValue("KitLugia", $"\"{path}\" --tray");
                     else key.DeleteValue("KitLugia", false);
                 }
             }
