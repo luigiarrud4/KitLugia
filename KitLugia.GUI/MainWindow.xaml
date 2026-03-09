@@ -40,6 +40,30 @@
                              Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"
                              ToolTip="Scanner de Segurança (Antigo Menu [S])"/>
 
+                <!-- BOTÃO ATUALIZAÇÃO (REFRESH) -->
+                <Button x:Name="BtnUpdate" Width="40" Height="32" Click="BtnUpdate_Click"
+                        Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
+                        ToolTip="Verificar Atualizações">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4">
+                                <TextBlock x:Name="refreshIcon" Text="↻" Foreground="#2196F3" FontWeight="Bold" 
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18">
+                                    <TextBlock.RenderTransform>
+                                        <RotateTransform CenterX="9" CenterY="9"/>
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#222196F3"/>
+                                    <Setter TargetName="refreshIcon" Property="Foreground" Value="#FFFFFF"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
                 <!-- BOTÃO DO CONSOLE (>_) -->
                 <Button x:Name="BtnConsole" Width="40" Height="32" Click="BtnConsole_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"

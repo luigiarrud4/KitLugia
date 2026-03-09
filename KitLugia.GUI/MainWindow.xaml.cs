@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics; // 🔥 Adicionado para corrigir Process
 using System.Threading.Tasks;

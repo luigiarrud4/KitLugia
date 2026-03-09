@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using Application = System.Windows.Application;
 using System;
 using System.Linq; // 🔥 Adicionado para corrigir .Contains()
