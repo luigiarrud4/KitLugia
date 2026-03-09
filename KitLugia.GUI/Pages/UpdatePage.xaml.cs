@@ -229,18 +229,12 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                // 🔥 Tenta extrair versão do Name (ex: "Release v2.0.1: ...")
-                if (tag.Contains("v2.0.1"))
-                {
-                    return new System.Version("2.0.1");
-                }
-                if (tag.Contains("v2.5.0"))
-                {
-                    return new System.Version("2.5.0");
-                }
+                KitLugia.Core.Logger.Log($"🔍 ParseVersion input: '{tag}'");
                 
-                // Remove prefixos e sufixos
+                // 🔥 Parser universal - detecta qualquer versão no formato vX.Y.Z
                 var cleanTag = tag;
+                
+                // Remove prefixos conhecidos
                 if (cleanTag.StartsWith("Release v"))
                 {
                     cleanTag = cleanTag.Substring(9); // Remove "Release v"
@@ -250,22 +244,52 @@ namespace KitLugia.GUI.Pages
                     cleanTag = cleanTag.Substring(1); // Remove "v"
                 }
                 
-                // Remove tudo após dois pontos
+                // Remove tudo após dois pontos OU traço
                 var colonIndex = cleanTag.IndexOf(':');
-                if (colonIndex > 0)
+                var dashIndex = cleanTag.IndexOf(" - ");
+                var cutIndex = cleanTag.Length;
+                
+                if (colonIndex > 0) cutIndex = Math.Min(cutIndex, colonIndex);
+                if (dashIndex > 0) cutIndex = Math.Min(cutIndex, dashIndex);
+                
+                if (cutIndex < cleanTag.Length)
                 {
-                    cleanTag = cleanTag.Substring(0, colonIndex);
+                    cleanTag = cleanTag.Substring(0, cutIndex);
                 }
                 
                 cleanTag = cleanTag.Trim();
                 
-                KitLugia.Core.Logger.Log($"🔍 ParseVersion: '{tag}' -> '{cleanTag}'");
+                // 🔥 Usa regex para extrair apenas o número da versão (ex: "2.0.3")
+                var versionMatch = System.Text.RegularExpressions.Regex.Match(cleanTag, @"^\d+\.\d+\.\d+");
+                if (versionMatch.Success)
+                {
+                    var versionString = versionMatch.Value;
+                    KitLugia.Core.Logger.Log($"🎯 ParseVersion success: '{tag}' -> '{versionString}'");
+                    return new System.Version(versionString);
+                }
                 
-                return System.Version.Parse(cleanTag);
+                // Se não encontrar pattern X.Y.Z, tenta X.Y
+                versionMatch = System.Text.RegularExpressions.Regex.Match(cleanTag, @"^\d+\.\d+");
+                if (versionMatch.Success)
+                {
+                    var versionString = versionMatch.Value + ".0"; // Adiciona .0 para completar
+                    KitLugia.Core.Logger.Log($"🎯 ParseVersion X.Y: '{tag}' -> '{versionString}'");
+                    return new System.Version(versionString);
+                }
+                
+                // Se não encontrou nada, tenta parse direto
+                if (System.Version.TryParse(cleanTag, out var directVersion))
+                {
+                    KitLugia.Core.Logger.Log($"🎯 ParseVersion direct: '{tag}' -> '{directVersion}'");
+                    return directVersion;
+                }
+                
+                KitLugia.Core.Logger.Log($"❌ ParseVersion failed: '{tag}' -> no version pattern found");
+                return new System.Version("1.0.0");
             }
             catch (Exception ex)
             {
-                KitLugia.Core.Logger.Log($"❌ Erro ao parsear versão '{tag}': {ex.Message}");
+                KitLugia.Core.Logger.Log($"❌ ParseVersion error: '{tag}' -> {ex.Message}");
                 return new System.Version("1.0.0");
             }
         }
