@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics; // 🔥 Adicionado para corrigir Process
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -92,6 +93,35 @@ namespace KitLugia.GUI
             if (TrayIconService.IsTrayEnabledStatic())
             {
                 TrayIconService.SetAutoStart(true);
+                
+                // 🔥 Verificação cirúrgica de instância única
+                var currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                Logger.Log($"KitLugia iniciado: {currentPath}");
+                Logger.Log($"Tray ativo: {TrayIconService.IsTrayEnabledStatic()}");
+                
+                // 🔥 CHECK 5: Verificação de saúde do Tray Icon após 3 segundos
+                var healthCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                healthCheckTimer.Tick += (s, e) =>
+                {
+                    healthCheckTimer.Stop();
+                    if (_trayService != null && !_trayService.IsTrayIconHealthy())
+                    {
+                        Logger.Log("❌ Tray Icon não está saudável, tentando recuperar...");
+                        if (_trayService.RecoverTrayIcon())
+                        {
+                            Logger.Log("✅ Tray Icon recuperado com sucesso");
+                        }
+                        else
+                        {
+                            Logger.Log("❌ Falha na recuperação do Tray Icon");
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log("✅ Tray Icon está saudável");
+                    }
+                };
+                healthCheckTimer.Start();
             }
 
             // --- NAMED EVENT: Permite que uma segunda instância sinalize para mostrar a janela ---
