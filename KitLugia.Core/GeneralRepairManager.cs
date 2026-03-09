@@ -669,14 +669,31 @@ namespace KitLugia.Core
 
             repairs.Add(new RepairAction
             {
-                Name = "Resetar GPO Local",
+                Name = "Resetar Políticas de grupo (GPO) COMPLETO",
                 Category = "Avançado",
                 Icon = "📜",
                 IsDangerous = true,
-                Description = "Restaura todas as Políticas de Grupo (Gpedit) para o padrão.",
+                Description = "Remove TODAS as políticas do registro e pastas GPO. Fix para 'gerenciado pela organização'.",
                 Execute = () => {
-                    Logger.Log("Apagando pastas de GPO local...");
-                    SystemUtils.RunExternalProcess("cmd", "/c RD /S /Q \"%WinDir%\\System32\\GroupPolicyUsers\" & RD /S /Q \"%WinDir%\\System32\\GroupPolicy\" & gpupdate /force", true);
+                    Logger.Log("Iniciando reset COMPLETO de políticas do Windows...");
+
+                    // 1. Deletar políticas do registro
+                    Logger.Log("Deletando políticas do registro...");
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\" /f", true);
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\" /f", true);
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\" /f", true);
+
+                    // 2. Deletar pastas Group Policy
+                    Logger.Log("Deletando pastas Group Policy...");
+                    SystemUtils.RunExternalProcess("cmd", "/c RD /S /Q \"%WinDir%\\System32\\GroupPolicyUsers\" >nul 2>&1", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c RD /S /Q \"%WinDir%\\System32\\GroupPolicy\" >nul 2>&1", true);
+
+                    // 3. Forçar atualização
+                    Logger.Log("Atualizando políticas...");
+                    SystemUtils.RunExternalProcess("gpupdate", "/force", true);
+
+                    Logger.Log("[SUCESSO] Reset completo finalizado! Reinicie o PC.");
+
                 }
             });
 
