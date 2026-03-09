@@ -5,11 +5,15 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media; // 🔥 Adicionado para animações
+using System.Windows.Media.Animation; // 🔥 Adicionado para Storyboard e DoubleAnimation
 using System.Windows.Threading;
 using KitLugia.Core;
 using KitLugia.GUI.Controls;
 using KitLugia.GUI.Pages;
 using KitLugia.GUI.Services;
+using MessageBox = System.Windows.MessageBox; // 🔥 Corrige ambiguidade
+using Button = System.Windows.Controls.Button; // 🔥 Corrige ambiguidade
 
 // --- CORREÇÃO DOS ERROS DE AMBIGUIDADE ---
 // Estas linhas forçam o código a usar os componentes do WPF
@@ -123,6 +127,13 @@ namespace KitLugia.GUI
                 };
                 healthCheckTimer.Start();
             }
+
+            // 🔥 AUTO-UPDATER: Inicia verificação automática em background
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10)); // Espera 10s para iniciar
+                await GitHubUpdater.StartAutoUpdateCheck();
+            });
 
             // --- NAMED EVENT: Permite que uma segunda instância sinalize para mostrar a janela ---
             _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "KitLugia_ShowWindow");
@@ -338,6 +349,7 @@ namespace KitLugia.GUI
                 "🔒" => new PrivacyPage(),
                 "🔑" => new ActivationPage(),
                 "🔔" => new TraySettingsPage(),
+                "🔄" => new UpdatePage(), // 🔥 Página de atualizações
                 _ => null
             };
 
@@ -371,11 +383,52 @@ namespace KitLugia.GUI
 
         private void BtnConsole_Click(object sender, RoutedEventArgs e)
         {
+            // Alterna a visibilidade do console
             if (GlobalConsolePanel != null)
             {
-                GlobalConsolePanel.Visibility = (GlobalConsolePanel.Visibility == Visibility.Visible)
-                    ? Visibility.Collapsed
-                    : Visibility.Visible;
+                GlobalConsolePanel.Visibility = GlobalConsolePanel.Visibility == Visibility.Collapsed 
+                    ? Visibility.Visible 
+                    : Visibility.Collapsed;
+            }
+        }
+
+        // --- ATUALIZAÇÃO: Botão de Atualizações ---
+        private async void BtnUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 🔥 ANIMAÇÃO: Gira o ícone de refresh (simplificado)
+                if (sender is Button btn)
+                {
+                    // Animação simples sem complexidade
+                    var storyboard = new Storyboard();
+                    var animation = new DoubleAnimation
+                    {
+                        From = 0,
+                        To = 360,
+                        Duration = TimeSpan.FromSeconds(1)
+                    };
+                    
+                    Storyboard.SetTarget(animation, btn);
+                    Storyboard.SetTargetProperty(animation, new PropertyPath("RenderTransform.(RotateTransform.Angle)"));
+                    
+                    btn.RenderTransform = new RotateTransform(18);
+                    storyboard.Children.Add(animation);
+                    storyboard.Begin();
+                }
+
+                // 🔥 ABRE DIRETO A PÁGINA DE ATUALIZAÇÕES
+                KitLugia.Core.Logger.Log("🔄 Abrindo página de atualizações...");
+                NavigateToPage("🔄");
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"❌ Erro ao abrir atualizações: {ex.Message}");
+                MessageBox.Show(
+                    $"Erro ao abrir página de atualizações:\n{ex.Message}",
+                    "Erro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
