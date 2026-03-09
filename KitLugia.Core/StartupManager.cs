@@ -598,5 +598,184 @@ namespace KitLugia.Core
         }
 
         #endregion
+
+        #region Auto-Updater Integration
+
+        public static void CheckAndFixStartupMethods()
+        {
+            try
+            {
+                Logger.Log("🔍 Verificando métodos de inicialização do KitLugia...");
+                
+                var currentExe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                
+                // Executar em background para não travar a UI
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        // 1. Verificar Registry Run (HKCU)
+                        CheckRegistryRun(currentExe);
+                        
+                        // 2. Verificar Task Scheduler
+                        CheckTaskScheduler(currentExe);
+                        
+                        // 3. Verificar Startup Folder
+                        CheckStartupFolder(currentExe);
+                        
+                        Logger.Log("✅ Verificação de inicialização concluída com sucesso");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"❌ Erro na verificação de inicialização: {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"❌ Erro ao iniciar verificação de inicialização: {ex.Message}");
+            }
+        }
+        
+        private static void CheckRegistryRun(string exePath)
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
+                {
+                    if (key == null)
+                    {
+                        Logger.Log("❌ Não foi possível acessar o registro Run");
+                        return;
+                    }
+
+                    var kitLugiaPath = key.GetValue("KitLugia") as string;
+                    
+                    if (string.IsNullOrEmpty(kitLugiaPath))
+                    {
+                        Logger.Log("❌ Nenhuma entrada no registro Run encontrada");
+                        Logger.Log("🔧 Criando entrada no registro Run...");
+                        key.SetValue("KitLugia", exePath + " --tray");
+                        Logger.Log("✅ Entrada no registro Run criada com --tray");
+                    }
+                    else if (!File.Exists(kitLugiaPath))
+                    {
+                        Logger.Log($"⚠️ Entrada no registro Run aponta para arquivo inexistente: {kitLugiaPath}");
+                        Logger.Log("🔧 Corrigindo entrada no registro...");
+                        key.SetValue("KitLugia", exePath + " --tray");
+                        Logger.Log("✅ Entrada no registro Run corrigida com --tray");
+                    }
+                    else if (kitLugiaPath != exePath)
+                    {
+                        Logger.Log($"⚠️ Entrada no registro Run aponta para versão antiga: {kitLugiaPath}");
+                        Logger.Log("🔧 Atualizando entrada no registro...");
+                        key.SetValue("KitLugia", exePath + " --tray");
+                        Logger.Log("✅ Entrada no registro Run atualizada com --tray");
+                    }
+                    else
+                    {
+                        // Verificar se já tem --tray
+                        if (!kitLugiaPath.Contains("--tray"))
+                        {
+                            Logger.Log("⚠️ Entrada no registro Run não tem --tray");
+                            Logger.Log("🔧 Adicionando --tray para garantir Tray Icon...");
+                            key.SetValue("KitLugia", kitLugiaPath + " --tray");
+                            Logger.Log("✅ --tray adicionado à entrada do registro Run");
+                        }
+                        else
+                        {
+                            Logger.Log("✅ Entrada no registro Run está correta com --tray");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"❌ Erro ao verificar registro Run: {ex.Message}");
+            }
+        }
+        
+        private static void CheckTaskScheduler(string exePath)
+        {
+            try
+            {
+                using (var ts = new TaskService())
+                {
+                    var task = ts.GetTask("KitLugia");
+                    
+                    if (task == null)
+                    {
+                        Logger.Log("❌ Nenhuma tarefa agendada encontrada");
+                        Logger.Log("ℹ️ Criando tarefa agendada para inicialização com Windows...");
+                        
+                        // Criar tarefa agendada
+                        var td = ts.NewTask();
+                        td.RegistrationInfo.Description = "KitLugia Auto-Startup";
+                        td.Settings.DisallowStartIfOnBatteries = false;
+                        td.Settings.StopIfGoingOnBatteries = false;
+                        td.Settings.ExecutionTimeLimit = TimeSpan.Zero;
+                        td.Settings.StartWhenAvailable = true;
+                        
+                        var trigger = new LogonTrigger
+                        {
+                            Delay = TimeSpan.FromSeconds(5)
+                        };
+                        td.Triggers.Add(trigger);
+                        td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath)));
+                        
+                        ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
+                        Logger.Log("✅ Tarefa agendada criada com sucesso");
+                    }
+                    else
+                    {
+                        var taskPath = task.Definition.Actions[0] as ExecAction;
+                        if (taskPath?.Path != exePath)
+                        {
+                            Logger.Log($"⚠️ Tarefa agendada aponta para: {taskPath?.Path}");
+                            Logger.Log("🔧 Atualizando tarefa agendada...");
+                            
+                            task.Definition.Actions.Clear();
+                            task.Definition.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath)));
+                            task.RegisterChanges();
+                            
+                            Logger.Log("✅ Tarefa agendada atualizada");
+                        }
+                        else
+                        {
+                            Logger.Log("✅ Tarefa agendada está correta");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"❌ Erro ao verificar Task Scheduler: {ex.Message}");
+            }
+        }
+        
+        private static void CheckStartupFolder(string exePath)
+        {
+            try
+            {
+                var startupPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                var shortcutPath = Path.Combine(startupPath, "KitLugia.lnk");
+                
+                if (!File.Exists(shortcutPath))
+                {
+                    Logger.Log("❌ Nenhum atalho na pasta Startup encontrado");
+                    Logger.Log("ℹ️ O KitLugia usa Registry Run e Task Scheduler para inicialização");
+                }
+                else
+                {
+                    Logger.Log("✅ Atalho na pasta Startup encontrado");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"❌ Erro ao verificar pasta Startup: {ex.Message}");
+            }
+        }
+
+        #endregion
     }
 }
