@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using KitLugia.Core;
+using KitLugia.Core; // 🔥 Adicionado para GitHubUpdater
 using MessageBox = System.Windows.MessageBox;
 using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
