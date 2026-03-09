@@ -120,11 +120,28 @@ namespace KitLugia.GUI.Services
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
                 if (key != null)
                 {
-                    if (enable) key.SetValue("KitLugia", $"\"{path}\" --tray");
-                    else key.DeleteValue("KitLugia", false);
+                    if (enable)
+                    {
+                        // 🔥 Verifica se há versão antiga para log (não remove ainda)
+                        var existingValue = key.GetValue("KitLugia")?.ToString();
+                        if (!string.IsNullOrEmpty(existingValue) && existingValue != $"\"{path}\" --tray")
+                        {
+                            Logger.Log($"Detectada versão antiga: {existingValue}");
+                            Logger.Log($"Atualizando para versão atual: \"{path}\" --tray");
+                        }
+                        
+                        key.SetValue("KitLugia", $"\"{path}\" --tray");
+                    }
+                    else
+                    {
+                        key.DeleteValue("KitLugia", false);
+                    }
                 }
             }
-            catch { }
+            catch (Exception ex) 
+            { 
+                KitLugia.Core.Logger.Log($"SetAutoStart ERROR: {ex.Message}"); 
+            }
         }
 
         // Adaptive Data
@@ -149,11 +166,35 @@ namespace KitLugia.GUI.Services
         {
             LoadSettings();
 
-            _trayIcon = new NotifyIcon
+            // 🔥 CHECK 1: Verificação se NotifyIcon pode ser criado
+            try
             {
-                Text = "KitLugia RAM Monitor",
-                Visible = IsTrayEnabled
-            };
+                _trayIcon = new NotifyIcon
+                {
+                    Text = "KitLugia RAM Monitor",
+                    Visible = false // Inicia oculto para verificação
+                };
+                KitLugia.Core.Logger.Log("NotifyIcon criado com sucesso");
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"ERRO ao criar NotifyIcon: {ex.Message}");
+                return;
+            }
+
+            // 🔥 CHECK 2: Verificação se o sistema suporta tray icons
+            try
+            {
+                // Testa se consegue criar um NotifyIcon temporário
+                using (var testIcon = new NotifyIcon())
+                {
+                    KitLugia.Core.Logger.Log("Sistema suporta NotifyIcon");
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"AVISO: Sistema pode não suportar NotifyIcon - {ex.Message}");
+            }
 
             // Generate the initial icon
             UpdateTrayIcon(0);
@@ -201,15 +242,42 @@ namespace KitLugia.GUI.Services
             // Double-click to open main window
             _trayIcon.DoubleClick += (s, e) => OnOpenMainWindow?.Invoke();
 
-            // Start monitoring if enabled
-            if (IsTrayEnabled)
+            // 🔥 CHECK 3: Verificação final antes de tornar visível
+            if (IsTrayEnabled && _trayIcon != null)
             {
-                _monitorTimer.Start();
-                // Run an initial Safety Profiler
-                Application.Current.Dispatcher.BeginInvoke(new Action(RunSafetyProfiler), DispatcherPriority.Background);
-                // First tick immediately
-                MonitorTick(null, EventArgs.Empty);
-
+                try
+                {
+                    // Força atualização do ícone antes de tornar visível
+                    UpdateTrayIcon(GetMemoryUsagePercent());
+                    
+                    // Torna visível e verifica
+                    _trayIcon.Visible = true;
+                    
+                    // 🔥 CHECK 4: Verificação se realmente ficou visível
+                    if (_trayIcon.Visible)
+                    {
+                        KitLugia.Core.Logger.Log("✅ Tray Icon ativado com sucesso");
+                        
+                        // Start monitoring if enabled
+                        _monitorTimer.Start();
+                        // Run an initial Safety Profiler
+                        Application.Current.Dispatcher.BeginInvoke(new Action(RunSafetyProfiler), DispatcherPriority.Background);
+                        // First tick immediately
+                        MonitorTick(null, EventArgs.Empty);
+                    }
+                    else
+                    {
+                        KitLugia.Core.Logger.Log("❌ ERRO: Tray Icon não ficou visível após tentativa");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    KitLugia.Core.Logger.Log($"❌ ERRO ao ativar Tray Icon: {ex.Message}");
+                }
+            }
+            else
+            {
+                KitLugia.Core.Logger.Log($"Tray Icon desativado ou nulo. Enabled: {IsTrayEnabled}, Icon: {_trayIcon != null}");
             }
 
             // Register for Shutdown events
@@ -765,6 +833,106 @@ namespace KitLugia.GUI.Services
                 "Monitorando RAM em segundo plano. Clique duas vezes para abrir.",
                 ToolTipIcon.Info
             );
+        }
+
+        // 🔥 MÉTODO DE VERIFICAÇÃO DE SAÚDE DO TRAY ICON
+        public bool IsTrayIconHealthy()
+        {
+            try
+            {
+                if (_trayIcon == null)
+                {
+                    KitLugia.Core.Logger.Log("❌ Tray Icon é null");
+                    return false;
+                }
+
+                if (!_trayIcon.Visible)
+                {
+                    KitLugia.Core.Logger.Log("❌ Tray Icon não está visível");
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(_trayIcon.Text))
+                {
+                    KitLugia.Core.Logger.Log("❌ Tray Icon Text está vazio");
+                    return false;
+                }
+
+                if (_trayIcon.ContextMenuStrip == null)
+                {
+                    KitLugia.Core.Logger.Log("❌ Tray Icon ContextMenu é null");
+                    return false;
+                }
+
+                // Testa se consegue atualizar o ícone
+                UpdateTrayIcon(GetMemoryUsagePercent());
+                
+                KitLugia.Core.Logger.Log("✅ Tray Icon está saudável");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"❌ Erro na verificação de saúde do Tray Icon: {ex.Message}");
+                return false;
+            }
+        }
+
+        // 🔥 MÉTODO DE RECUPERAÇÃO DO TRAY ICON
+        public bool RecoverTrayIcon()
+        {
+            try
+            {
+                KitLugia.Core.Logger.Log("🔄 Tentando recuperar Tray Icon...");
+                
+                // Dispose do antigo
+                if (_trayIcon != null)
+                {
+                    _trayIcon.Visible = false;
+                    _trayIcon.Dispose();
+                }
+
+                // Recria completamente
+                _trayIcon = new NotifyIcon
+                {
+                    Text = "KitLugia RAM Monitor",
+                    Visible = false
+                };
+
+                // Recria menu
+                var menu = new ContextMenuStrip();
+                var itemClean = new ToolStripMenuItem("🧹 Limpar RAM Agora");
+                itemClean.Click += (s, e) => CleanRamNow();
+                menu.Items.Add(itemClean);
+                
+                var itemOpen = new ToolStripMenuItem("🚀 Abrir KitLugia");
+                itemOpen.Click += (s, e) => OnOpenMainWindow?.Invoke();
+                menu.Items.Add(itemOpen);
+                
+                var itemExit = new ToolStripMenuItem("❌ Sair");
+                itemExit.Click += (s, e) =>
+                {
+                    Dispose();
+                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+                };
+                menu.Items.Add(itemExit);
+
+                _trayIcon.ContextMenuStrip = menu;
+                _trayIcon.DoubleClick += (s, e) => OnOpenMainWindow?.Invoke();
+
+                // Ativa
+                UpdateTrayIcon(GetMemoryUsagePercent());
+                _trayIcon.Visible = true;
+
+                bool success = _trayIcon.Visible;
+                KitLugia.Core.Logger.Log(success ? "✅ Tray Icon recuperado com sucesso" : "❌ Falha na recuperação do Tray Icon");
+                
+                return success;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"❌ Erro na recuperação do Tray Icon: {ex.Message}");
+                return false;
+            }
         }
 
         public void Dispose()
