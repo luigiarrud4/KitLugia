@@ -27,6 +27,9 @@ namespace KitLugia.GUI
 
             base.OnStartup(e);
 
+            // 🔥 Verificar e corrigir métodos de inicialização
+            KitLugia.Core.StartupManager.CheckAndFixStartupMethods();
+
             var mainWindow = new MainWindow();
             
             // Só exibe a janela principal se não tiver o argumento --tray
