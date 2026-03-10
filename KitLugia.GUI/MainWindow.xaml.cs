@@ -393,7 +393,7 @@ namespace KitLugia.GUI
         }
 
         // --- ATUALIZAÇÃO: Botão de Atualizações ---
-        private async void BtnUpdate_Click(object sender, RoutedEventArgs e)
+        private void BtnUpdate_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -530,6 +530,65 @@ namespace KitLugia.GUI
                 toast.Dismissed += OnToastDismissed;
             });
         }
+        #endregion
+
+        #region Loading Overlay Methods
+
+        /// <summary>
+        /// Mostra o overlay de carregamento com mensagem personalizada
+        /// </summary>
+        public void ShowLoading(string message = "Processando...")
+        {
+            if (LoadingOverlay != null)
+            {
+                LoadingOverlay.Message = message;
+                LoadingOverlay.Visibility = Visibility.Visible;
+            }
+        }
+
+        /// <summary>
+        /// Esconde o overlay de carregamento
+        /// </summary>
+        public void HideLoading()
+        {
+            if (LoadingOverlay != null)
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Executa uma operação pesada em background mostrando loading
+        /// </summary>
+        public async Task<T> ExecuteWithLoadingAsync<T>(string message, Func<T> operation)
+        {
+            ShowLoading(message);
+            try
+            {
+                return await Task.Run(() => operation());
+            }
+            finally
+            {
+                HideLoading();
+            }
+        }
+
+        /// <summary>
+        /// Executa uma operação pesada em background mostrando loading (void)
+        /// </summary>
+        public async Task ExecuteWithLoadingAsync(string message, Action operation)
+        {
+            ShowLoading(message);
+            try
+            {
+                await Task.Run(() => operation());
+            }
+            finally
+            {
+                HideLoading();
+            }
+        }
+
         #endregion
     }
 }

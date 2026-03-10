@@ -309,6 +309,12 @@
             </Grid>
 
             <!-- ========================================================= -->
+            <!-- LOADING OVERLAY -->
+            <!-- ========================================================= -->
+            <controls:LoadingOverlay x:Name="LoadingOverlay" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="2" 
+                                   Visibility="Collapsed" Panel.ZIndex="99999"/>
+
+            <!-- ========================================================= -->
             <!-- CONSOLE GLOBAL (Terminal no Rodapé) -->
             <!-- ========================================================= -->
             <!-- Fica na Row 1, ocupa toda a largura (ColumnSpan 2), Altura definida no controle (200) -->
