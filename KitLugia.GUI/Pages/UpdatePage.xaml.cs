@@ -35,20 +35,15 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                // 🔥 VERSÃO HARDCODED - Você compilou a versão 2.0.5 agora
-                var currentVersion = GetCurrentVersion();
-                var assembly = Assembly.GetExecutingAssembly();
-                var location = assembly.Location;
-                var buildDate = File.GetLastWriteTime(location);
-                
-                KitLugia.Core.Logger.Log($"🎯 Versão atual: {currentVersion}");
-                KitLugia.Core.Logger.Log($"📁 Arquivo: {location}");
-                KitLugia.Core.Logger.Log($"🕐 Build: {buildDate}");
-                
                 // Informações da versão atual
-                CurrentVersionText.Text = $"v{currentVersion}";
+                var assembly = Assembly.GetExecutingAssembly();
+                var version = assembly.GetName().Version?.ToString() ?? "2.5.0";
+                var buildDate = System.IO.File.GetLastWriteTime(assembly.Location);
+                var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+
+                CurrentVersionText.Text = $"v{version}";
                 CurrentDateText.Text = buildDate.ToString("dd/MM/yyyy HH:mm");
-                CurrentPathText.Text = location.Length > 40 ? location.Substring(0, 37) + "..." : location;
+                CurrentPathText.Text = exePath.Length > 40 ? exePath.Substring(0, 37) + "..." : exePath;
 
                 // Informações do sistema
                 var runtimeVersion = Environment.Version.ToString();
@@ -59,11 +54,7 @@ namespace KitLugia.GUI.Pages
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Build: {GetBuildType()}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Runtime: .NET {runtimeVersion}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Plataforma: Windows {platform}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Executável: {Path.GetFileName(location)}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Versão: {currentVersion}", FontSize = 12, Foreground = Brushes.Blue, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Build Time: {buildDate:HH:mm:ss}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Timezone: {TimeZoneInfo.Local.DisplayName}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Status: ✅ Atual", FontSize = 12, Foreground = Brushes.Green, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Executável: {Path.GetFileName(exePath)}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
             }
             catch (Exception ex)
             {
@@ -95,31 +86,29 @@ namespace KitLugia.GUI.Pages
                 CheckButton.IsEnabled = false;
                 UpdateButton.IsEnabled = false;
 
-                // 🔥 UNIVERSAL TIMEZONE - Funciona em QUALQUER lugar do mundo!
-                KitLugia.Core.Logger.Log("🌍 Usando Universal Timezone Detector (funciona globalmente)...");
+                // 🔥 Busca informações detalhadas primeiro
+                await GetReleaseDetails();
                 
-                var universalResult = await UniversalTimezoneDetector.CheckUniversalVersion();
-                
-                if (universalResult != null && universalResult.IsSuccess)
+                if (_latestRelease != null)
                 {
-                    // Mostra informações universais
-                    LatestVersionText.Text = $"GitHub: {universalResult.GitHubLocal.ToString("HH:mm:ss")}";
-                    LatestDateText.Text = $"Local: {universalResult.LocalFileTime.ToString("HH:mm:ss")}";
-                    LatestSizeText.Text = universalResult.HasNewerVersion ? "NOVA" : "ATUAL";
+                    // 🔥 Usa a versão do release (pode ser "Update" ou tag)
+                    var currentVersion = GetCurrentVersion();
+                    var latestVersion = ParseVersion(_latestRelease.TagName); // 🔥 USA TAGNAME!
                     
-                    // Mensagem universal com timezone
-                    ReleaseNotesText.Text = universalResult.Message;
+                    KitLugia.Core.Logger.Log($"📦 Versão atual: {currentVersion}");
+                    KitLugia.Core.Logger.Log($"🚀 Versão latest: {latestVersion}");
                     
-                    if (universalResult.HasNewerVersion)
+                    // 🔥 Considera "Update" como mais recente que qualquer versão 1.0.0.0
+                    var hasUpdate = (_latestRelease.TagName == "Update" && currentVersion.Major == 1) || latestVersion > currentVersion;
+                    
+                    if (hasUpdate)
                     {
                         StatusText.Text = "✅ Nova versão disponível!";
                         StatusBorder.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Verde forte
                         StatusText.Foreground = Brushes.White;
                         UpdateButton.IsEnabled = true;
                         
-                        StatusText.Text = $"🌍 {universalResult.Message}";
-                        
-                        KitLugia.Core.Logger.Log($"� Universal Timezone detectou nova versão!");
+                        StatusText.Text = $"🚀 Atualização disponível: {_latestRelease.Name}";
                     }
                     else
                     {
@@ -131,70 +120,7 @@ namespace KitLugia.GUI.Pages
                         LatestVersionText.Text = GetCurrentVersion().ToString();
                         LatestDateText.Text = "Você já está na versão mais recente";
                         LatestSizeText.Text = "N/A";
-                        ReleaseNotesText.Text = universalResult.Message;
-                        
-                        KitLugia.Core.Logger.Log($"� Universal Timezone confirma: versão atualizada");
-                    }
-                    
-                    // Adiciona informações universais no painel
-                    AddUniversalTimezoneInfo(universalResult);
-                }
-                else
-                {
-                    // Fallback para o sistema GitHub original
-                    KitLugia.Core.Logger.Log("🔄 Fallback para sistema GitHub...");
-                    await GetReleaseDetails();
-                    
-                    if (_latestRelease != null)
-                    {
-                        // Continua com o fluxo original...
-                        var currentVersion = GetCurrentVersion();
-                        var latestVersion = ParseVersion(_latestRelease.Name);
-                        
-                        KitLugia.Core.Logger.Log($"📦 Versão atual: {currentVersion}");
-                        KitLugia.Core.Logger.Log($"🚀 Versão latest: {latestVersion}");
-                        
-                        // 🔥 NOVA LÓGICA: Prioridade 1 - Versão Numérica
-                        var hasUpdate = latestVersion > currentVersion;
-                        
-                        if (!hasUpdate)
-                        {
-                            KitLugia.Core.Logger.Log($"📊 Versão numérica: {currentVersion} >= {latestVersion} - OK");
-                            
-                            // Prioridade 2 - Só se versões forem IGUAIS, usa timestamp
-                            if (latestVersion == currentVersion)
-                            {
-                                KitLugia.Core.Logger.Log($"📅 Versões iguais, verificando timestamp...");
-                                hasUpdate = await CompareByFileDate();
-                                KitLugia.Core.Logger.Log($"📅 Comparação por data: {hasUpdate}");
-                            }
-                        }
-                        else
-                        {
-                            KitLugia.Core.Logger.Log($"📊 Versão numérica: {currentVersion} < {latestVersion} - ATUALIZAR!");
-                        }
-                        
-                        if (hasUpdate)
-                        {
-                            StatusText.Text = "✅ Nova versão disponível!";
-                            StatusBorder.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Verde forte
-                            StatusText.Foreground = Brushes.White;
-                            UpdateButton.IsEnabled = true;
-                            
-                            StatusText.Text = $"🚀 Atualização disponível: {_latestRelease.Name}";
-                        }
-                        else
-                        {
-                            StatusText.Text = "✅ KitLugia está atualizado!";
-                            StatusBorder.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Verde forte
-                            StatusText.Foreground = Brushes.White;
-                            UpdateButton.IsEnabled = false;
-                            
-                            LatestVersionText.Text = GetCurrentVersion().ToString();
-                            LatestDateText.Text = "Você já está na versão mais recente";
-                            LatestSizeText.Text = "N/A";
-                            ReleaseNotesText.Text = "Nenhuma atualização disponível no momento.";
-                        }
+                        ReleaseNotesText.Text = "Nenhuma atualização disponível no momento.";
                     }
                 }
             }
@@ -290,28 +216,12 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                // 🔥 VERSÃO REAL DO ASSEMBLY - Controlada por você no .csproj
                 var assembly = Assembly.GetExecutingAssembly();
-                var assemblyVersion = assembly.GetName().Version;
-                
-                KitLugia.Core.Logger.Log($"🎯 Versão Assembly: {assemblyVersion}");
-                KitLugia.Core.Logger.Log($"📁 Arquivo: {assembly.Location}");
-                
-                // Usa a versão real do assembly (agora controlada por você!)
-                if (assemblyVersion != null)
-                {
-                    KitLugia.Core.Logger.Log($"✅ Usando versão assembly real: {assemblyVersion}");
-                    return assemblyVersion;
-                }
-                
-                // Fallback extremo (nunca deve acontecer)
-                KitLugia.Core.Logger.Log("⚠️ Fallback para versão hardcoded");
-                return new System.Version("2.0.5");
+                return assembly.GetName().Version ?? new System.Version("2.5.0");
             }
-            catch (Exception ex)
+            catch
             {
-                KitLugia.Core.Logger.Log($"❌ Erro ao obter versão: {ex.Message}");
-                return new System.Version("2.0.5");
+                return new System.Version("2.5.0");
             }
         }
 
@@ -321,137 +231,69 @@ namespace KitLugia.GUI.Pages
             {
                 KitLugia.Core.Logger.Log($"🔍 ParseVersion input: '{tag}'");
                 
-                if (string.IsNullOrWhiteSpace(tag))
+                // 🔥 Parser universal - detecta qualquer versão no formato vX.Y.Z
+                var cleanTag = tag;
+                
+                // Remove "KitLugia" e prefixos conhecidos
+                if (cleanTag.StartsWith("KitLugia "))
                 {
-                    KitLugia.Core.Logger.Log("❌ ParseVersion: tag está vazia");
-                    return new System.Version("1.0.0");
+                    cleanTag = cleanTag.Substring(9); // Remove "KitLugia "
+                }
+                if (cleanTag.StartsWith("Release v"))
+                {
+                    cleanTag = cleanTag.Substring(9); // Remove "Release v"
+                }
+                else if (cleanTag.StartsWith("v"))
+                {
+                    cleanTag = cleanTag.Substring(1); // Remove "v"
                 }
                 
-                var cleanTag = tag.Trim();
-                
-                // 🔥 UNIVERSAL PARSER - Funciona com QUALQUER formato
-                
-                // 1. Remove prefixos conhecidos
-                var prefixes = new[] { "KitLugia", "Release", "Version", "v" };
-                foreach (var prefix in prefixes)
-                {
-                    if (cleanTag.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        cleanTag = cleanTag.Substring(prefix.Length).Trim();
-                        KitLugia.Core.Logger.Log($"🔧 Removido prefixo '{prefix}': '{cleanTag}'");
-                    }
-                }
-                
-                // 2. Remove sufixos conhecidos
-                var suffixes = new[] { "Bugfix", "Update", "Release", "Final", "Beta", "Alpha", "RC" };
+                // Remove sufixos conhecidos
+                var suffixes = new[] { " Bugfix", " Release", " Beta", " Alpha", " Stable", " -", " " };
                 foreach (var suffix in suffixes)
                 {
-                    if (cleanTag.Contains(suffix, StringComparison.OrdinalIgnoreCase))
+                    var index = cleanTag.IndexOf(suffix);
+                    if (index > 0)
                     {
-                        var index = cleanTag.IndexOf(suffix, StringComparison.OrdinalIgnoreCase);
-                        cleanTag = cleanTag.Substring(0, index).Trim();
+                        cleanTag = cleanTag.Substring(0, index);
                         KitLugia.Core.Logger.Log($"🔧 Removido sufixo '{suffix}': '{cleanTag}'");
                     }
                 }
                 
-                // 3. Remove separadores e caracteres especiais
-                cleanTag = System.Text.RegularExpressions.Regex.Replace(cleanTag, @"[^\d\.]", "");
-                cleanTag = cleanTag.Trim('.');
-                KitLugia.Core.Logger.Log($"🔧 Versão limpa: '{cleanTag}'");
+                cleanTag = cleanTag.Trim();
                 
-                // 4. Extrai apenas números e pontos
-                var match = System.Text.RegularExpressions.Regex.Match(cleanTag, @"^\d+(?:\.\d+)*");
-                if (match.Success)
+                // 🔥 Usa regex para extrair apenas o número da versão (ex: "2.0.3")
+                var versionMatch = System.Text.RegularExpressions.Regex.Match(cleanTag, @"^\d+\.\d+\.\d+");
+                if (versionMatch.Success)
                 {
-                    var versionString = match.Value;
-                    KitLugia.Core.Logger.Log($"🎯 Números extraídos: '{versionString}'");
-                    
-                    if (System.Version.TryParse(versionString, out var version))
-                    {
-                        KitLugia.Core.Logger.Log($"🎯 ParseVersion success: '{tag}' -> '{version}'");
-                        return version;
-                    }
+                    var versionString = versionMatch.Value;
+                    KitLugia.Core.Logger.Log($"🎯 ParseVersion success: '{tag}' -> '{versionString}'");
+                    return new System.Version(versionString);
                 }
                 
-                // Fallback se não conseguiu parse
-                KitLugia.Core.Logger.Log($"⚠️ ParseVersion fallback: '{tag}' -> 1.0.0");
+                // Se não encontrar pattern X.Y.Z, tenta X.Y
+                versionMatch = System.Text.RegularExpressions.Regex.Match(cleanTag, @"^\d+\.\d+");
+                if (versionMatch.Success)
+                {
+                    var versionString = versionMatch.Value + ".0"; // Adiciona .0 para completar
+                    KitLugia.Core.Logger.Log($"🎯 ParseVersion X.Y: '{tag}' -> '{versionString}'");
+                    return new System.Version(versionString);
+                }
+                
+                // Se não encontrou nada, tenta parse direto
+                if (System.Version.TryParse(cleanTag, out var directVersion))
+                {
+                    KitLugia.Core.Logger.Log($"🎯 ParseVersion direct: '{tag}' -> '{directVersion}'");
+                    return directVersion;
+                }
+                
+                KitLugia.Core.Logger.Log($"❌ ParseVersion failed: '{tag}' -> no version pattern found");
                 return new System.Version("1.0.0");
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"❌ ParseVersion error: '{tag}' -> {ex.Message}");
                 return new System.Version("1.0.0");
-            }
-        }
-
-        private async Task<bool> CompareByFileDate()
-        {
-            try
-            {
-                KitLugia.Core.Logger.Log("📅 Comparando versões por data do arquivo...");
-                
-                // Data do arquivo atual
-                var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                var currentDate = System.IO.File.GetLastWriteTime(currentExePath);
-                
-                // Data do release do GitHub
-                var releaseDate = _latestRelease.PublishedAt;
-                
-                KitLugia.Core.Logger.Log($"📅 Data arquivo atual: {currentDate:yyyy-MM-dd HH:mm:ss}");
-                KitLugia.Core.Logger.Log($"📅 Data release GitHub: {releaseDate:yyyy-MM-dd HH:mm:ss}");
-                
-                // Se o release for mais recente que o arquivo, há atualização
-                var hasUpdate = releaseDate > currentDate;
-                
-                if (hasUpdate)
-                {
-                    KitLugia.Core.Logger.Log($"✅ Release mais recente por {releaseDate - currentDate}");
-                }
-                else
-                {
-                    KitLugia.Core.Logger.Log($"✅ Arquivo atual está atualizado");
-                }
-                
-                return hasUpdate;
-            }
-            catch (Exception ex)
-            {
-                KitLugia.Core.Logger.Log($"❌ Erro na comparação por data: {ex.Message}");
-                return false;
-            }
-        }
-
-        private void AddUniversalTimezoneInfo(UniversalComparison universalResult)
-        {
-            try
-            {
-                // Adiciona informações universais de timezone no CurrentInfoPanel
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• GitHub UTC: {universalResult.GitHubUTC:HH:mm:ss}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• GitHub Local: {universalResult.GitHubLocal:HH:mm:ss}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Local UTC: {universalResult.LocalFileUTC:HH:mm:ss}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Local Time: {universalResult.LocalFileTime:HH:mm:ss}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                
-                // TimeDifference nunca é null (TimeSpan é struct)
-                var diff = universalResult.TimeDifference;
-                var diffText = diff.TotalMinutes > 0 
-                    ? $"+{diff.TotalMinutes:F0} min" 
-                    : $"{diff.TotalMinutes:F0} min";
-                
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Diferença UTC: {diffText}", FontSize = 12, Foreground = diff.TotalMinutes > 0 ? Brushes.Orange : Brushes.Green, Margin = new Thickness(0, 2, 0, 2) });
-                
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Timezone: {universalResult.UserTimezoneName}", FontSize = 12, Foreground = Brushes.Blue, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Offset: {universalResult.UserTimezoneOffset}", FontSize = 12, Foreground = Brushes.Blue, Margin = new Thickness(0, 2, 0, 2) });
-                
-                // Indicador visual de sincronização
-                var syncStatus = universalResult.HasNewerVersion ? "⏰ Desatualizado" : "✅ Sincronizado";
-                var syncColor = universalResult.HasNewerVersion ? Brushes.Orange : Brushes.Green;
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Status Global: {syncStatus}", FontSize = 12, Foreground = syncColor, Margin = new Thickness(0, 2, 0, 2) });
-                
-                KitLugia.Core.Logger.Log("✅ Informações universais de timezone adicionadas à UI");
-            }
-            catch (Exception ex)
-            {
-                KitLugia.Core.Logger.Log($"❌ Erro ao adicionar universal timezone info: {ex.Message}");
             }
         }
 
