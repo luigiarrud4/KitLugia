@@ -7,6 +7,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using KitLugia.Core;
+using Microsoft.Win32.TaskScheduler; // 🔥 Adicionar Task Scheduler
+using System.IO; // 🔥 Adicionar Path
 using Application = System.Windows.Application;
 using Timer = System.Windows.Threading.DispatcherTimer;
 
@@ -117,24 +119,87 @@ namespace KitLugia.GUI.Services
                 string path = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 if (string.IsNullOrEmpty(path)) return;
 
-                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
-                if (key != null)
+                // 🔥 CORREÇÃO: Usar Task Scheduler com privilégios admin em vez de Registry
+                try
                 {
-                    if (enable)
+                    using (var ts = new TaskService())
                     {
-                        // 🔥 Verifica se há versão antiga para log (não remove ainda)
-                        var existingValue = key.GetValue("KitLugia")?.ToString();
-                        if (!string.IsNullOrEmpty(existingValue) && existingValue != $"\"{path}\" --tray")
+                        if (enable)
                         {
-                            Logger.Log($"Detectada versão antiga: {existingValue}");
-                            Logger.Log($"Atualizando para versão atual: \"{path}\" --tray");
+                            // Remover entrada antiga do Registry se existir
+                            try
+                            {
+                                using var regKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+                                if (regKey?.GetValue("KitLugia") != null)
+                                {
+                                    KitLugia.Core.Logger.Log("Removendo entrada antiga do Registry...");
+                                    regKey.DeleteValue("KitLugia", false);
+                                }
+                            }
+                            catch { }
+
+                            // Verificar se tarefa já existe
+                            var existingTask = ts.GetTask("KitLugia");
+                            if (existingTask != null)
+                            {
+                                KitLugia.Core.Logger.Log("Tarefa do KitLugia já existe, atualizando...");
+                                ts.RootFolder.DeleteTask("KitLugia");
+                            }
+
+                            // Criar nova tarefa com privilégios admin
+                            var td = ts.NewTask();
+                            td.RegistrationInfo.Description = "KitLugia Auto-Startup (Admin Mode)";
+                            td.Principal.RunLevel = TaskRunLevel.Highest; // 🔥 ADMIN PRIVILEGES
+                            td.Settings.DisallowStartIfOnBatteries = false;
+                            td.Settings.StopIfGoingOnBatteries = false;
+                            td.Settings.ExecutionTimeLimit = TimeSpan.Zero;
+                            td.Settings.StartWhenAvailable = true;
+                            td.Settings.AllowHardTerminate = false;
+
+                            // Trigger: Logon imediato para inicialização rápida
+                            var trigger = new LogonTrigger
+                            {
+                                Delay = TimeSpan.Zero, // 🔥 INICIALIZAÇÃO IMEDIATA
+                                Enabled = true
+                            };
+                            td.Triggers.Add(trigger);
+
+                            // Action: Executar com --tray
+                            td.Actions.Add(new ExecAction(path, "--tray", Path.GetDirectoryName(path)));
+
+                            // Registrar tarefa
+                            ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
+                            KitLugia.Core.Logger.Log("✅ Tarefa agendada com privilégios admin criada: " + path);
                         }
-                        
-                        key.SetValue("KitLugia", $"\"{path}\" --tray");
+                        else
+                        {
+                            // Remover tarefa
+                            var task = ts.GetTask("KitLugia");
+                            if (task != null)
+                            {
+                                ts.RootFolder.DeleteTask("KitLugia");
+                                KitLugia.Core.Logger.Log("✅ Tarefa agendada removida");
+                            }
+                        }
                     }
-                    else
+                }
+                catch (Exception taskEx)
+                {
+                    KitLugia.Core.Logger.Log($"ERRO no Task Scheduler: {taskEx.Message}");
+                    
+                    // Fallback para Registry (sem privilégios admin)
+                    KitLugia.Core.Logger.Log("Usando fallback Registry Run (sem privilégios admin)...");
+                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+                    if (key != null)
                     {
-                        key.DeleteValue("KitLugia", false);
+                        if (enable)
+                        {
+                            key.SetValue("KitLugia", $"\"{path}\" --tray");
+                        }
+                        else
+                        {
+                            key.DeleteValue("KitLugia", false);
+                        }
                     }
                 }
             }
@@ -150,8 +215,8 @@ namespace KitLugia.GUI.Services
         private long _lastCleanDurationMs = 0;
         private string _logPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KitLugia", "ram_stats.csv");
 
-        public event Action? OnOpenMainWindow;
-        public event Action? OnOpenSettings;
+        public event System.Action? OnOpenMainWindow;
+        public event System.Action? OnOpenSettings;
 
         public TrayIconService()
         {
@@ -261,7 +326,7 @@ namespace KitLugia.GUI.Services
                         // Start monitoring if enabled
                         _monitorTimer.Start();
                         // Run an initial Safety Profiler
-                        Application.Current.Dispatcher.BeginInvoke(new Action(RunSafetyProfiler), DispatcherPriority.Background);
+                        Application.Current.Dispatcher.BeginInvoke(new System.Action(RunSafetyProfiler), DispatcherPriority.Background);
                         // First tick immediately
                         MonitorTick(null, EventArgs.Empty);
                     }
@@ -736,34 +801,49 @@ namespace KitLugia.GUI.Services
                     return;
                 }
 
-                Stopwatch sw = Stopwatch.StartNew();
-                int before = GetMemoryUsagePercent();
-                var result = MemoryOptimizer.Optimize(SelectedCleaningMode);
-                int after = GetMemoryUsagePercent();
-                sw.Stop();
-
-                _lastCleanDurationMs = sw.ElapsedMilliseconds;
-
-                // If cleaning takes too long (> 800ms on a 32GB system), it might cause stutter
-                // Adaptive learning: wait more cycles before next auto-clean
-                if (_lastCleanDurationMs > 800)
+                // 🔥 CORREÇÃO: Executar em Task separada para não congelar UI
+                System.Threading.Tasks.Task.Run(() =>
                 {
-                    _stutterBackoffCycles = 3; // Skip next 3 cycles (~1.5 min)
-                }
+                    try
+                    {
+                        Stopwatch sw = Stopwatch.StartNew();
+                        int before = GetMemoryUsagePercent();
+                        var result = MemoryOptimizer.Optimize(SelectedCleaningMode);
+                        int after = GetMemoryUsagePercent();
+                        sw.Stop();
 
-                int freed = before - after;
-                string msg = freed > 0
-                    ? $"RAM liberada! {before}% → {after}% ({freed}% liberado) [{_lastCleanDurationMs}ms]"
-                    : $"Limpeza concluída. RAM: {after}%";
+                        _lastCleanDurationMs = sw.ElapsedMilliseconds;
 
-                UpdateTrayIcon(after);
+                        // If cleaning takes too long (> 800ms on a 32GB system), it might cause stutter
+                        // Adaptive learning: wait more cycles before next auto-clean
+                        if (_lastCleanDurationMs > 800)
+                        {
+                            _stutterBackoffCycles = 3; // Skip next 3 cycles (~1.5 min)
+                        }
 
-                _trayIcon?.ShowBalloonTip(
-                    3000,
-                    "KitLugia RAM Booster",
-                    msg,
-                    ToolTipIcon.Info
-                );
+                        int freed = before - after;
+                        string msg = freed > 0
+                            ? $"RAM liberada! {before}% → {after}% ({freed}% liberado) [{_lastCleanDurationMs}ms]"
+                            : $"Limpeza concluída. RAM: {after}%";
+
+                        // Atualizar UI na thread principal
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            UpdateTrayIcon(after);
+
+                            _trayIcon?.ShowBalloonTip(
+                                3000,
+                                "KitLugia RAM Booster",
+                                msg,
+                                ToolTipIcon.Info
+                            );
+                        });
+                    }
+                    catch
+                    {
+                        // Silently ignore clean errors
+                    }
+                });
             }
             catch
             {
