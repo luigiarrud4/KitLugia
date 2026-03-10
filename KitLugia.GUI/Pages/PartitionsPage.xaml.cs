@@ -11,6 +11,8 @@ using KitLugia.Core;
 using KitLugia.GUI.Controls;
 using System.Windows.Threading;
 
+#pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
+
 // Resolvendo ambiguidades de tipo (WPF vs WinForms)
 using Button = System.Windows.Controls.Button;
 using TextBox = System.Windows.Controls.TextBox;

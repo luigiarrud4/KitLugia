@@ -14,6 +14,8 @@ using System.Windows.Threading;
 using MessageBox = System.Windows.MessageBox; // Resolve ambiguidade com WinForms
 using Application = System.Windows.Application;
 
+#pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
+
 namespace KitLugia.GUI.Pages
 {
     public partial class PrivacyPage : Page

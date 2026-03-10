@@ -11,6 +11,8 @@ using Button = System.Windows.Controls.Button;
 
 using Application = System.Windows.Application;
 
+#pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
+
 namespace KitLugia.GUI.Pages
 {
     public partial class BloatwarePage : Page

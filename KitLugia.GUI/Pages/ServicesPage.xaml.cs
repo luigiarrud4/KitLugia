@@ -11,6 +11,8 @@ using Microsoft.Win32; // Para OpenFileDialog
 using Button = System.Windows.Controls.Button;
 using Application = System.Windows.Application;
 
+#pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
+
 namespace KitLugia.GUI.Pages
 {
     public partial class ServicesPage : Page
@@ -65,7 +67,7 @@ namespace KitLugia.GUI.Pages
                     if (result.Success)
                     {
                         mw.ShowSuccess("STARTUP", $"{selectedApp.Name} foi {(willEnable ? "Habilitado" : "Desabilitado")}.");
-                        LoadStartupApps();
+                        await LoadStartupApps();
                     }
                     else mw.ShowError("ERRO", result.Message);
                 }
@@ -80,7 +82,7 @@ namespace KitLugia.GUI.Pages
                 {
                     if (!await mw.ShowConfirmationDialog($"Excluir '{selectedApp.Name}' permanentemente?")) return;
                     var result = await Task.Run(() => StartupManager.RemoveStartupItem(selectedApp.Name));
-                    if (result.Success) { mw.ShowSuccess("REMOVIDO", result.Message); LoadStartupApps(); }
+                    if (result.Success) { mw.ShowSuccess("REMOVIDO", result.Message); await LoadStartupApps(); }
                     else mw.ShowError("ERRO", result.Message);
                 }
             }

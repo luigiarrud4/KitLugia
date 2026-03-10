@@ -13,6 +13,8 @@ using Application = System.Windows.Application;
 using WinForms = System.Windows.Forms; // Para diálogos de pasta
 using Color = System.Windows.Media.Color;
 
+#pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
+
 namespace KitLugia.GUI.Pages
 {
     public partial class DriversPage : Page

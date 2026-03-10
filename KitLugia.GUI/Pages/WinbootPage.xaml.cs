@@ -8,6 +8,8 @@ using System.Windows.Controls;
 using KitLugia.Core;
 using Microsoft.Win32;
 
+#pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
+
 namespace KitLugia.GUI.Pages
 {
     public partial class WinbootPage : Page

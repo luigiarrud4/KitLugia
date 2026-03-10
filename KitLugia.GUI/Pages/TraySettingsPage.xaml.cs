@@ -8,6 +8,8 @@ using Microsoft.Win32;
 using System.Collections.Generic;
 using System.Linq;
 using Application = System.Windows.Application;
+using Microsoft.Win32.TaskScheduler; // 🔥 Adicionar Task Scheduler
+using Task = System.Threading.Tasks.Task; // 🔥 Corrigir ambiguidade
 
 namespace KitLugia.GUI.Pages
 {
@@ -56,10 +58,33 @@ namespace KitLugia.GUI.Pages
             // Auto-start
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, false);
-                ChkAutoStart.IsChecked = key?.GetValue(AutoStartValueName) != null;
+                // 🔥 CORREÇÃO: Verificar Task Scheduler em vez de Registry
+                using (var ts = new TaskService())
+                {
+                    var task = ts.GetTask("KitLugia");
+                    ChkAutoStart.IsChecked = task?.Enabled == true;
+                    
+                    // Se não encontrou tarefa, verificar fallback no Registry
+                    if (task == null)
+                    {
+                        using var regKey = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, false);
+                        ChkAutoStart.IsChecked = regKey?.GetValue(AutoStartValueName) != null;
+                    }
+                }
             }
-            catch { ChkAutoStart.IsChecked = false; }
+            catch 
+            { 
+                // Fallback para verificação de Registry
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, false);
+                    ChkAutoStart.IsChecked = key?.GetValue(AutoStartValueName) != null;
+                }
+                catch 
+                { 
+                    ChkAutoStart.IsChecked = false; 
+                }
+            }
 
             LoadTurboApps();
         }
@@ -113,27 +138,33 @@ namespace KitLugia.GUI.Pages
 
         // --- EVENT HANDLERS ---
 
-        private void BtnCleanNow_Click(object sender, RoutedEventArgs e)
+        private async void BtnCleanNow_Click(object sender, RoutedEventArgs e)
         {
             var tray = GetTrayService();
             if (tray == null) return;
 
             if (Application.Current.MainWindow is MainWindow mw)
-                mw.ShowInfo("BOOSTER", $"Limpando RAM (Modo: {tray.SelectedCleaningMode})...");
+            {
+                await mw.ExecuteWithLoadingAsync($"Limpando RAM (Modo: {tray.SelectedCleaningMode})...", () =>
+                {
+                    var memBefore = GetMemoryStats();
+                    var result = MemoryOptimizer.Optimize(tray.SelectedCleaningMode);
+                    var memAfter = GetMemoryStats();
 
-            var memBefore = GetMemoryStats();
-            var result = MemoryOptimizer.Optimize(tray.SelectedCleaningMode);
-            var memAfter = GetMemoryStats();
+                    int freedPercent = memBefore.Percent - memAfter.Percent;
+                    double freedGB = memAfter.FreeGB - memBefore.FreeGB;
 
-            int freedPercent = memBefore.Percent - memAfter.Percent;
-            double freedGB = memBefore.FreeGB - memAfter.FreeGB; // Wait, FreeGB increases, so Before - After is negative.
-            freedGB = memAfter.FreeGB - memBefore.FreeGB;
+                    // Atualizar UI na thread principal
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        TxtFreedLast.Text = $"Última limpeza: {DateTime.Now:HH:mm} ({(freedGB > 0 ? freedGB : 0):F2} GB)";
+                        RefreshRamDisplay();
+                        mw.ShowSuccess("Otimizado", result.Message);
+                    });
 
-            TxtFreedLast.Text = $"Última limpeza: {DateTime.Now:HH:mm} ({(freedGB > 0 ? freedGB : 0):F2} GB)";
-            RefreshRamDisplay();
-
-            if (Application.Current.MainWindow is MainWindow mw2)
-                mw2.ShowSuccess("Otimizado", result.Message);
+                    return result;
+                });
+            }
         }
 
         private void Mode_Click(object sender, RoutedEventArgs e)
@@ -186,16 +217,28 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, true);
-                if (key == null) return;
-
-                if (ChkAutoStart.IsChecked == true)
+                // 🔥 CORREÇÃO: Usar Task Scheduler em vez de Registry
+                TrayIconService.SetAutoStart(ChkAutoStart.IsChecked == true);
+                
+                // Verificar se funcionou atualizando o estado
+                try
                 {
-                    string exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                    if (!string.IsNullOrEmpty(exePath))
-                        key.SetValue(AutoStartValueName, $"\"{exePath}\" --tray", RegistryValueKind.String);
+                    using (var ts = new TaskService())
+                    {
+                        var task = ts.GetTask("KitLugia");
+                        bool isTaskEnabled = task?.Enabled == true;
+                        
+                        if (ChkAutoStart.IsChecked == true && !isTaskEnabled)
+                        {
+                            // Se não conseguiu criar tarefa, mostrar aviso
+                            if (Application.Current.MainWindow is MainWindow mw)
+                            {
+                                mw.ShowInfo("AVISO", "Tarefa agendada não pode ser criada. Usando fallback sem privilégios admin.");
+                            }
+                        }
+                    }
                 }
-                else { key.DeleteValue(AutoStartValueName, false); }
+                catch { }
             }
             catch { }
         }

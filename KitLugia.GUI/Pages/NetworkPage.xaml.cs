@@ -13,6 +13,8 @@ using KitLugia.GUI.Controls;
 using Color = System.Windows.Media.Color;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
+
+#pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
 using Brushes = System.Windows.Media.Brushes;
 using ToolTip = System.Windows.Controls.ToolTip;
 

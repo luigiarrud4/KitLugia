@@ -645,44 +645,47 @@ del ""%~f0"" >nul 2>&1
             {
                 KitLugia.Core.Logger.Log("📦 Fazendo backup da versão atual...");
 
-                // Backup executável principal
-                var currentExe = Path.Combine(currentDir, "KitLugia.GUI.exe");
-                if (File.Exists(currentExe))
+                await Task.Run(() =>
                 {
-                    File.Copy(currentExe, Path.Combine(backupDir, "KitLugia.GUI.exe"), true);
-                }
+                    // Backup executável principal
+                    var currentExe = Path.Combine(currentDir, "KitLugia.GUI.exe");
+                    if (File.Exists(currentExe))
+                    {
+                        File.Copy(currentExe, Path.Combine(backupDir, "KitLugia.GUI.exe"), true);
+                    }
 
-                // Backup DLLs principais
-                foreach (var dll in Directory.GetFiles(currentDir, "KitLugia*.dll"))
-                {
-                    var dllName = Path.GetFileName(dll);
-                    File.Copy(dll, Path.Combine(backupDir, dllName), true);
-                }
+                    // Backup DLLs principais
+                    foreach (var dll in Directory.GetFiles(currentDir, "KitLugia*.dll"))
+                    {
+                        var dllName = Path.GetFileName(dll);
+                        File.Copy(dll, Path.Combine(backupDir, dllName), true);
+                    }
 
                 // Backup arquivos de configuração
-                var configFiles = new[] { "appsettings.json", "settings.json", "*.config" };
-                foreach (var pattern in configFiles)
-                {
-                    foreach (var file in Directory.GetFiles(currentDir, pattern))
+                    var configFiles = new[] { "appsettings.json", "settings.json", "*.config" };
+                    foreach (var pattern in configFiles)
                     {
-                        var fileName = Path.GetFileName(file);
-                        File.Copy(file, Path.Combine(backupDir, fileName), true);
+                        foreach (var file in Directory.GetFiles(currentDir, pattern))
+                        {
+                            var fileName = Path.GetFileName(file);
+                            File.Copy(file, Path.Combine(backupDir, fileName), true);
+                        }
                     }
-                }
 
-                // Backup pastas externas (external, clover, etc.)
-                var externalFolders = new[] { "external", "clover", "tools", "resources" };
-                foreach (var folder in externalFolders)
-                {
-                    var sourceFolder = Path.Combine(currentDir, folder);
-                    if (Directory.Exists(sourceFolder))
+                    // Backup pastas externas (external, clover, etc.)
+                    var externalFolders = new[] { "external", "clover", "tools", "resources" };
+                    foreach (var folder in externalFolders)
                     {
-                        var targetFolder = Path.Combine(backupDir, folder);
-                        CopyDirectory(sourceFolder, targetFolder, true);
+                        var sourceFolder = Path.Combine(currentDir, folder);
+                        if (Directory.Exists(sourceFolder))
+                        {
+                            var targetFolder = Path.Combine(backupDir, folder);
+                            CopyDirectory(sourceFolder, targetFolder, true);
+                        }
                     }
-                }
 
-                KitLugia.Core.Logger.Log("✅ Backup concluído");
+                    KitLugia.Core.Logger.Log("✅ Backup concluído");
+                });
             }
             catch (Exception ex)
             {
@@ -696,27 +699,30 @@ del ""%~f0"" >nul 2>&1
             {
                 KitLugia.Core.Logger.Log("📦 Extraindo nova versão...");
 
-                var sourceDir = Path.GetDirectoryName(newExePath);
-
-                // Copiar executável principal
-                var newExeName = Path.GetFileName(newExePath);
-                File.Copy(newExePath, Path.Combine(updateDir, newExeName), true);
-
-                // Copiar DLLs
-                foreach (var dll in Directory.GetFiles(sourceDir, "*.dll"))
+                await Task.Run(() =>
                 {
-                    var dllName = Path.GetFileName(dll);
-                    File.Copy(dll, Path.Combine(updateDir, dllName), true);
-                }
+                    var sourceDir = Path.GetDirectoryName(newExePath);
+
+                    // Copiar executável principal
+                    var newExeName = Path.GetFileName(newExePath);
+                    File.Copy(newExePath, Path.Combine(updateDir, newExeName), true);
+
+                    // Copiar DLLs
+                    foreach (var dll in Directory.GetFiles(sourceDir, "*.dll"))
+                    {
+                        var dllName = Path.GetFileName(dll);
+                        File.Copy(dll, Path.Combine(updateDir, dllName), true);
+                    }
 
                 // Copiar arquivos de configuração
-                foreach (var json in Directory.GetFiles(sourceDir, "*.json"))
-                {
-                    var jsonName = Path.GetFileName(json);
-                    File.Copy(json, Path.Combine(updateDir, jsonName), true);
-                }
+                    foreach (var json in Directory.GetFiles(sourceDir, "*.json"))
+                    {
+                        var jsonName = Path.GetFileName(json);
+                        File.Copy(json, Path.Combine(updateDir, jsonName), true);
+                    }
 
-                KitLugia.Core.Logger.Log("✅ Nova versão extraída");
+                    KitLugia.Core.Logger.Log("✅ Nova versão extraída");
+                });
             }
             catch (Exception ex)
             {
@@ -874,7 +880,7 @@ del ""%~f0"" >nul 2>&1";
             return System.Text.Encoding.UTF8.GetBytes(cmdContent);
         }
 
-        private async Task<string> CreateUltraSimpleBootstrapper(string bootstrapDir, string manifestFile)
+        private Task<string> CreateUltraSimpleBootstrapper(string bootstrapDir, string manifestFile)
         {
             try
             {
@@ -909,12 +915,12 @@ del ""%~f0"" >nul 2>&1";
 
                 KitLugia.Core.Logger.Log("✅ Arquivo CMD criado");
 
-                return cmdFile;
+                return Task.FromResult(cmdFile);
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"❌ Erro no bootstrapper ultra-simples: {ex.Message}");
-                return string.Empty;
+                return Task.FromResult(string.Empty);
             }
         }
 
