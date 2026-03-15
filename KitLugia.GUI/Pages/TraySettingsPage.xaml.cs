@@ -203,7 +203,16 @@ namespace KitLugia.GUI.Pages
             var tray = GetTrayService();
             if (tray == null || !(sender is System.Windows.Controls.CheckBox cb)) return;
 
-            if (cb == ChkGamePriority) tray.GamePriorityEnabled = cb.IsChecked == true;
+            if (cb == ChkGamePriority)
+            {
+                tray.GamePriorityEnabled = cb.IsChecked == true;
+                if (tray.GamePriorityEnabled)
+                {
+                    ChkAutoStart.IsChecked = true;
+                    // Trigger the auto-start logic right away to persist the system task
+                    ChkAutoStart_Click(ChkAutoStart, new RoutedEventArgs());
+                }
+            }
             else if (cb == ChkStandbyClean) tray.StandbyCleanEnabled = cb.IsChecked == true;
             else if (cb == ChkAntiLeak) tray.MemoryLeakDetectionEnabled = cb.IsChecked == true;
             else if (cb == ChkFocusAssist) tray.FocusAssistEnabled = cb.IsChecked == true;

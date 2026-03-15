@@ -1,4 +1,4 @@
-﻿<Page x:Class="KitLugia.GUI.Pages.DashboardPage"
+<Page x:Class="KitLugia.GUI.Pages.DashboardPage"
 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 Title="Sistema">
@@ -200,7 +200,17 @@ Title="Sistema">
                     <CheckBox x:Name="ChkExtremeVisuals" Content="Modo Extreme (Remover Animações)" Foreground="White" Margin="0,0,0,10"/>
                     <CheckBox x:Name="ChkPowerPlan" Content="Ativar Plano Bitsum Highest Performance" IsChecked="True" Foreground="White" Margin="0,0,0,10"/>
                     <CheckBox x:Name="ChkTurboShutdown" Content="Desligamento Turbo (Shutdownturbo 2s)" IsChecked="True" Foreground="White" Margin="0,0,0,10"/>
-                    <CheckBox x:Name="ChkSystemTweaks" Content="Tweaks de Registro (Cache, Explorer, Bing)" IsChecked="True" Foreground="White" Margin="0,0,0,25"/>
+                    <CheckBox x:Name="ChkSystemTweaks" Content="Tweaks de Registro (Cache, Explorer, Bing)" IsChecked="True" Foreground="White" Margin="0,0,0,20"/>
+                    
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- TWEAKS QUE INICIAM JUNTO COM O PC -->
+                    <TextBlock Text="TWEAKS QUE INICIAM JUNTO COM O PC" Foreground="#FFD54F" FontSize="12" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBlock Text="Melhorias mantidas em segundo plano após otimização inicial." Foreground="#AAA" FontSize="10" Margin="0,0,0,10" TextWrapping="Wrap"/>
+                    
+                    <CheckBox x:Name="ChkTrayIcon" Content="1. Ícone de bandeja (Monitor RAM e CPU)" Foreground="White" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="ChkStartWithWindows" Content="2. Iniciar com o Windows (Silencioso)" Foreground="White" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="ChkGameBoost" Content="3. GameBoost (Prioridade Máxima para Jogos)" Foreground="White" Margin="0,0,0,25" Click="ChkGameBoost_Click"/>
 
                     <Grid>
                         <Grid.ColumnDefinitions>

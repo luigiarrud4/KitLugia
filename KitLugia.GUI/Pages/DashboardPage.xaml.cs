@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -63,6 +63,35 @@ namespace KitLugia.GUI.Pages
             OverlayQuickMenu.Visibility = Visibility.Visible;
             PopulateGpuList();
             UpdateVramRecommendations();
+            LoadTraySettingsToQuickMenu();
+        }
+
+        private void LoadTraySettingsToQuickMenu()
+        {
+            try
+            {
+                var mw = Application.Current.MainWindow as MainWindow;
+                if (mw?.TrayService != null)
+                {
+                    ChkTrayIcon.IsChecked = mw.TrayService.IsTrayEnabled;
+                    ChkGameBoost.IsChecked = mw.TrayService.GamePriorityEnabled;
+                }
+
+                using (var ts = new Microsoft.Win32.TaskScheduler.TaskService())
+                {
+                    var task = ts.GetTask("KitLugia");
+                    ChkStartWithWindows.IsChecked = task?.Enabled == true;
+                }
+            }
+            catch { }
+        }
+
+        private void ChkGameBoost_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkGameBoost.IsChecked == true)
+            {
+                ChkStartWithWindows.IsChecked = true;
+            }
         }
 
         private void UpdateVramRecommendations()
@@ -148,6 +177,8 @@ namespace KitLugia.GUI.Pages
                 SystemTweaks.ToggleFastShutdown();
             }
 
+            ApplyTraySettingsFromQuickMenu();
+
             // Detectar RegPath da GPU selecionada
             int index = CmbGpu.SelectedIndex;
             var allGpus = SystemTweaks.GetAllGpus();
@@ -194,6 +225,23 @@ namespace KitLugia.GUI.Pages
             {
                 mw.ShowError("ERRO", $"Falha ao reverter: {ex.Message}");
             }
+        }
+
+        private void ApplyTraySettingsFromQuickMenu()
+        {
+            try
+            {
+                var mw = Application.Current.MainWindow as MainWindow;
+                if (mw?.TrayService != null)
+                {
+                    mw.TrayService.SetTrayEnabled(ChkTrayIcon.IsChecked == true);
+                    mw.TrayService.GamePriorityEnabled = ChkGameBoost.IsChecked == true;
+                    mw.TrayService.SaveSettings();
+
+                    KitLugia.GUI.Services.TrayIconService.SetAutoStart(ChkStartWithWindows.IsChecked == true);
+                }
+            }
+            catch { }
         }
 
         // Lógica compartilhada de execução
