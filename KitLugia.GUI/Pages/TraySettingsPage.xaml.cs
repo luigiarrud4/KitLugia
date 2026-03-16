@@ -206,12 +206,8 @@ namespace KitLugia.GUI.Pages
             if (cb == ChkGamePriority)
             {
                 tray.GamePriorityEnabled = cb.IsChecked == true;
-                if (tray.GamePriorityEnabled)
-                {
-                    ChkAutoStart.IsChecked = true;
-                    // Trigger the auto-start logic right away to persist the system task
-                    ChkAutoStart_Click(ChkAutoStart, new RoutedEventArgs());
-                }
+                // Removido auto-start forçado para evitar impacto na performance
+                // GameBoost agora funciona independente de auto-start
             }
             else if (cb == ChkStandbyClean) tray.StandbyCleanEnabled = cb.IsChecked == true;
             else if (cb == ChkAntiLeak) tray.MemoryLeakDetectionEnabled = cb.IsChecked == true;

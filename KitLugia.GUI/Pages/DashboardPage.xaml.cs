@@ -88,10 +88,8 @@ namespace KitLugia.GUI.Pages
 
         private void ChkGameBoost_Click(object sender, RoutedEventArgs e)
         {
-            if (ChkGameBoost.IsChecked == true)
-            {
-                ChkStartWithWindows.IsChecked = true;
-            }
+            // Removido auto-start forçado para evitar impacto na performance
+            // GameBoost agora funciona independente de auto-start
         }
 
         private void UpdateVramRecommendations()
