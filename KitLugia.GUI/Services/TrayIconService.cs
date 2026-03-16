@@ -748,14 +748,6 @@ namespace KitLugia.GUI.Services
                     proc.PriorityClass = ProcessPriorityClass.High;
                 }
 
-                // Tweak extra GameBoost: Ativar o Dynamic Priority Boost para o Agendador de Tarefas do Windows dar quantuns (fatias de tempo extras) para a thread do jogo em foreground
-                try
-                {
-                    // A property pode lançar exceção de "Acesso Negado" dependendo das permissões do processo, por isso o try-catch interno
-                    proc.PriorityBoostEnabled = true;
-                }
-                catch { }
-
                 // Tweak 2 & 3: I/O Priority High (3) e Page Priority Máxima (5)
                 Win32Api.SetProcessIoPriority(proc.Handle, 3);
                 Win32Api.SetProcessPagePriority(proc.Handle, 5);
