@@ -38,6 +38,7 @@ namespace KitLugia.Core
             public string Body { get; set; } = "";
             public bool Prerelease { get; set; }
             public DateTime PublishedAt { get; set; }
+            public string HtmlUrl { get; set; } = "";
             public Asset[] Assets { get; set; } = Array.Empty<Asset>();
         }
 
