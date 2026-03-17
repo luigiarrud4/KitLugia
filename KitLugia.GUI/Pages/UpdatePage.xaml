@@ -38,12 +38,17 @@
                         <Border Background="#1E88E5" CornerRadius="6" Padding="15" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock x:Name="CurrentVersionText" Text="v2.5.0" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF"/>
-                                <TextBlock x:Name="CurrentDateText" Text="08/03/2026 22:00" FontSize="12" Foreground="#E3F2FD" Margin="0,5,0,0"/>
-                                <TextBlock x:Name="CurrentPathText" Text="C:\Users\Lugia\Downloads\..." FontSize="10" Foreground="#BBDEFB" Margin="0,5,0,0"/>
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="🔍 INFORMAÇÕES" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,15,0,10"/>
+                        <TextBlock Text="🕐 INFORMAÇÕES DE VERSÃO" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,15,0,10"/>
+                        <StackPanel x:Name="CurrentVersionInfoPanel" Margin="0,0,0,15">
+                            <TextBlock Text="• Compilado: --/--/---- --:--" FontSize="12" Foreground="#E0E0E0" Margin="0,2" x:Name="CurrentBuildDateText"/>
+                            <TextBlock Text="• Agora: --/--/---- --:--" FontSize="12" Foreground="#E0E0E0" Margin="0,2" x:Name="CurrentNowDateText"/>
+                            <TextBlock Text="• Timezone: (UTC±00:00) Local" FontSize="12" Foreground="#E0E0E0" Margin="0,2" x:Name="CurrentTimezoneText"/>
+                        </StackPanel>
+
+                        <TextBlock Text="🔍 INFORMAÇÕES TÉCNICAS" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,10"/>
                         <StackPanel x:Name="CurrentInfoPanel">
                             <TextBlock Text="• Build: Release" FontSize="12" Foreground="#E0E0E0" Margin="0,2"/>
                             <TextBlock Text="• Runtime: .NET 8.0" FontSize="12" Foreground="#E0E0E0" Margin="0,2"/>
@@ -125,33 +130,33 @@
                     </Button.Style>
                 </Button>
                 
-                <Button x:Name="UpdateButton" Grid.Column="1" Content="🚀 Baixar e Instalar" 
+                <Button x:Name="UpdateButton" Grid.Column="1" Content="� Abrir Link de Download" 
                         Padding="20,12" Margin="10,0,0,0"
-                        Background="#4CAF50" Foreground="White"
-                        BorderThickness="1" BorderBrush="#388E3C" FontSize="14"
+                        Background="#FFD700" Foreground="Black"
+                        BorderThickness="1" BorderBrush="#FFA500" FontSize="14"
                         IsEnabled="False"
                         Cursor="Hand"
-                        Click="UpdateButton_Click">
+                        Click="OpenDownloadLink_Click">
                     <Button.Style>
                         <Style TargetType="Button">
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="ButtonBorder" 
-                                                Background="#4CAF50" 
-                                                BorderBrush="#388E3C" 
+                                                Background="#FFD700" 
+                                                BorderBrush="#FFA500" 
                                                 BorderThickness="1" 
                                                 CornerRadius="4">
                                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="ButtonBorder" Property="Background" Value="#66BB6A"/>
-                                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2E7D32"/>
+                                                <Setter TargetName="ButtonBorder" Property="Background" Value="#FFED4E"/>
+                                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FF9800"/>
                                             </Trigger>
                                             <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="ButtonBorder" Property="Background" Value="#43A047"/>
-                                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#1B5E20"/>
+                                                <Setter TargetName="ButtonBorder" Property="Background" Value="#FFC107"/>
+                                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#F57C00"/>
                                             </Trigger>
                                             <Trigger Property="IsEnabled" Value="False">
                                                 <Setter TargetName="ButtonBorder" Property="Background" Value="#CCCCCC"/>
@@ -170,21 +175,21 @@
             <!-- Info Box -->
             <Border Background="#2B2B2B" CornerRadius="8" Margin="0,15,0,0" Padding="15" BorderBrush="#444444" BorderThickness="1">
                 <StackPanel>
-                    <TextBlock Text="ℹ️ SOBRE O AUTO-UPDATER" FontWeight="SemiBold" FontSize="12" Foreground="#FFFFFF" Margin="0,0,0,5"/>
+                    <TextBlock Text="ℹ️ SOBRE ATUALIZAÇÕES" FontWeight="SemiBold" FontSize="12" Foreground="#FFFFFF" Margin="0,0,0,5"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="• Verificação automática a cada 24h" FontSize="10" Foreground="#E0E0E0"/>
-                            <TextBlock Text="• Download direto do GitHub" FontSize="10" Foreground="#E0E0E0"/>
-                            <TextBlock Text="• Instalação silenciosa" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="• Verificação automática do GitHub" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="• Download manual seguro" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="• Release notes detalhados" FontSize="10" Foreground="#E0E0E0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="• Backup automático" FontSize="10" Foreground="#E0E0E0"/>
-                            <TextBlock Text="• Verificação de integridade" FontSize="10" Foreground="#E0E0E0"/>
-                            <TextBlock Text="• Reinício automático" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="• Sem permissões admin" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="• Backup antes de atualizar" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="• Controle total do usuário" FontSize="10" Foreground="#E0E0E0"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

@@ -27,38 +27,113 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             Loaded += UpdatePage_Loaded;
             
-            // Carrega informações da versão atual
-            LoadCurrentVersionInfo();
+            // ✅ Carregar informações após inicialização completa
+            Dispatcher.BeginInvoke(async () => await LoadCurrentVersionInfoAsync());
         }
 
-        private void LoadCurrentVersionInfo()
+        private void UpdatePage_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Event handler vazio - apenas para garantir que Loaded seja disparado
+        }
+
+        private async Task LoadCurrentVersionInfoAsync()
         {
             try
             {
+                // ✅ Mostrar status de carregamento
+                CurrentVersionText.Text = "🔄 Carregando...";
+                
                 // Informações da versão atual
                 var assembly = Assembly.GetExecutingAssembly();
-                var version = assembly.GetName().Version?.ToString() ?? "2.5.0";
+                var assemblyVersion = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
+                
+                // 🔥 MELHORIA: Usar SmartVersionDetector DINÂMICO (GitHub) - COM TIMEOUT!
                 var buildDate = System.IO.File.GetLastWriteTime(assembly.Location);
+                
+                // ✅ Adicionar timeout de 10 segundos para evitar congelamento
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                
+                var versionInfo = await Task.Run(async () => 
+                {
+                    return await KitLugia.Core.SmartVersionDetector.GetVersionInfoAsync(buildDate);
+                }, cts.Token);
+                
+                var localBuildDate = DateTimeOffset.Now; // Data/hora atual com timezone do usuário
                 var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
 
-                CurrentVersionText.Text = $"v{version}";
-                CurrentDateText.Text = buildDate.ToString("dd/MM/yyyy HH:mm");
-                CurrentPathText.Text = exePath.Length > 40 ? exePath.Substring(0, 37) + "..." : exePath;
-
+                // 🎯 NOVO: Mostrar versão REAL do GitHub
+                CurrentVersionText.Text = $"v{versionInfo.RealVersion}";
+                
+                // 🎯 NOVO: Preencher informações de versão separadamente
+                CurrentBuildDateText.Text = $"• Compilado: {buildDate:dd/MM/yyyy HH:mm}";
+                CurrentNowDateText.Text = $"• Agora: {localBuildDate:dd/MM/yyyy HH:mm}";
+                
                 // Informações do sistema
                 var runtimeVersion = Environment.Version.ToString();
                 var platform = Environment.Is64BitOperatingSystem ? "x64" : "x86";
+                var timezone = TimeZoneInfo.Local.DisplayName;
+                var utcOffset = DateTimeOffset.Now.Offset;
                 
-                // Limpa e adiciona informações atualizadas
+                // 🎯 NOVO: Timezone separado
+                CurrentTimezoneText.Text = $"• Timezone: {timezone} ({utcOffset})";
+                
+                // Limpa e adiciona informações técnicas atualizadas
                 CurrentInfoPanel.Children.Clear();
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Build: {GetBuildType()}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Runtime: .NET {runtimeVersion}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Plataforma: Windows {platform}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Executável: {Path.GetFileName(exePath)}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
+                
+                // 🎯 NOVO: Adicionar informações de detecção DINÂMICA
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Assembly: {assemblyVersion}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Detecção: {versionInfo.DetectionMethod}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Releases Online: {versionInfo.TotalReleases}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
+                
+                // 📊 LOG para debug
+                KitLugia.Core.Logger.Log($"📦 Versão DINÂMICA: Real={versionInfo.RealVersion}, Assembly={assemblyVersion}, Método={versionInfo.DetectionMethod}, Total={versionInfo.TotalReleases}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // ✅ Erro de permissão - mostrar fallback
+                CurrentVersionText.Text = "v2.0.5";
+                CurrentBuildDateText.Text = $"• Compilado: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                CurrentNowDateText.Text = $"• Agora: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}";
+                CurrentTimezoneText.Text = $"• Timezone: {TimeZoneInfo.Local.DisplayName}";
+                
+                CurrentInfoPanel.Children.Clear();
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = "• Erro: Permissão de Administrador", FontSize = 12, Foreground = Brushes.Red, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = "• Solução: Executar como Administrador", FontSize = 12, Foreground = Brushes.Red, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = "• Status: Fallback Local", FontSize = 12, Foreground = Brushes.Orange, Margin = new Thickness(0, 2, 0, 2) });
+                
+                KitLugia.Core.Logger.Log($"❌ Erro de permissão: {ex.Message}");
+            }
+            catch (OperationCanceledException)
+            {
+                // ✅ Timeout - mostrar fallback
+                CurrentVersionText.Text = "v2.0.5";
+                CurrentBuildDateText.Text = $"• Compilado: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                CurrentNowDateText.Text = $"• Agora: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}";
+                CurrentTimezoneText.Text = $"• Timezone: {TimeZoneInfo.Local.DisplayName}";
+                
+                CurrentInfoPanel.Children.Clear();
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = "• Detecção: Timeout (10s)", FontSize = 12, Foreground = Brushes.Orange, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = "• Status: Modo Offline", FontSize = 12, Foreground = Brushes.Orange, Margin = new Thickness(0, 2, 0, 2) });
+                
+                KitLugia.Core.Logger.Log("⏰ Timeout na detecção de versão - usando fallback");
             }
             catch (Exception ex)
             {
-                KitLugia.Core.Logger.Log($"Erro ao carregar info da versão atual: {ex.Message}");
+                // ✅ Erro - mostrar fallback
+                CurrentVersionText.Text = "v2.0.5";
+                CurrentBuildDateText.Text = $"• Compilado: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                CurrentNowDateText.Text = $"• Agora: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}";
+                CurrentTimezoneText.Text = $"• Timezone: {TimeZoneInfo.Local.DisplayName}";
+                
+                CurrentInfoPanel.Children.Clear();
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"• Erro: {ex.Message}", FontSize = 12, Foreground = Brushes.Red, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = "• Status: Fallback Local", FontSize = 12, Foreground = Brushes.Red, Margin = new Thickness(0, 2, 0, 2) });
+                
+                KitLugia.Core.Logger.Log($"❌ Erro na detecção de versão: {ex.Message}");
             }
         }
 
@@ -69,11 +144,6 @@ namespace KitLugia.GUI.Pages
 #else
             return "Release";
 #endif
-        }
-
-        private async void UpdatePage_Loaded(object sender, RoutedEventArgs e)
-        {
-            await CheckForUpdatesAsync();
         }
 
         private async Task CheckForUpdatesAsync()
@@ -104,8 +174,8 @@ namespace KitLugia.GUI.Pages
                     if (hasUpdate)
                     {
                         StatusText.Text = "✅ Nova versão disponível!";
-                        StatusBorder.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Verde forte
-                        StatusText.Foreground = Brushes.White;
+                        StatusBorder.Background = new SolidColorBrush(Color.FromRgb(255, 215, 0)); // Dourado KitLugia
+                        StatusText.Foreground = Brushes.Black;
                         UpdateButton.IsEnabled = true;
                         
                         StatusText.Text = $"🚀 Atualização disponível: {_latestRelease.Name}";
@@ -137,6 +207,35 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private void OpenDownloadLink_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_latestRelease?.HtmlUrl != null)
+                {
+                    // Abrir link do GitHub no navegador padrão
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = _latestRelease.HtmlUrl,
+                        UseShellExecute = true
+                    });
+                    
+                    KitLugia.Core.Logger.Log($"🔗 Link de atualização aberto: {_latestRelease.HtmlUrl}");
+                }
+                else
+                {
+                    MessageBox.Show("Link de download não disponível. Tente verificar as atualizações novamente.", 
+                        "Link Indisponível", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"Erro ao abrir link de download: {ex.Message}");
+                MessageBox.Show($"Não foi possível abrir o link: {ex.Message}", 
+                    "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private async Task GetReleaseDetails()
         {
             try
@@ -165,9 +264,9 @@ namespace KitLugia.GUI.Pages
                         var displayVersion = !string.IsNullOrEmpty(_latestRelease.TagName) ? _latestRelease.TagName : "Update";
                         LatestVersionText.Text = displayVersion;
                         
-                        // 🔥 Correção: Formata data corretamente
+                        // 🔥 Correção: Formata data corretamente com timezone local
                         var displayDate = _latestRelease.PublishedAt != DateTime.MinValue 
-                            ? _latestRelease.PublishedAt.ToString("dd/MM/yyyy HH:mm")
+                            ? _latestRelease.PublishedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") + " (local)"
                             : "09/03/2026 01:49"; // Data do JSON
                         LatestDateText.Text = displayDate;
                         
@@ -216,12 +315,27 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
+                // 🔥 MELHORIA: Usar SmartVersionDetector DINÂMICO (GitHub)
                 var assembly = Assembly.GetExecutingAssembly();
-                return assembly.GetName().Version ?? new System.Version("2.5.0");
+                var buildDate = System.IO.File.GetLastWriteTime(assembly.Location);
+                var realVersion = KitLugia.Core.SmartVersionDetector.GetRealVersion(buildDate);
+                
+                // Converter string de versão para Version object
+                if (System.Version.TryParse(realVersion, out var version))
+                {
+                    KitLugia.Core.Logger.Log($"📦 Versão DINÂMICA detectada: {realVersion}");
+                    return version;
+                }
+                
+                // Fallback para assembly version
+                var assemblyVersion = assembly.GetName().Version ?? new System.Version("2.0.5");
+                KitLugia.Core.Logger.Log($"📦 Usando assembly version: {assemblyVersion}");
+                return assemblyVersion;
             }
-            catch
+            catch (Exception ex)
             {
-                return new System.Version("2.5.0");
+                KitLugia.Core.Logger.Log($"❌ Erro ao obter versão atual: {ex.Message}");
+                return new System.Version("2.0.5"); // Fallback seguro
             }
         }
 
@@ -302,28 +416,9 @@ namespace KitLugia.GUI.Pages
             await CheckForUpdatesAsync();
         }
 
-        private async void UpdateButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isUpdating) return;
-
-            var result = MessageBox.Show(
-                $"Deseja baixar e instalar a versão {_latestRelease?.Name}?\n\n" +
-                "O aplicativo será fechado durante a atualização.\n" +
-                "Seus arquivos de configuração serão preservados.",
-                "Confirmar Atualização",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                _isUpdating = true;
-                StatusText.Text = "🔄 Preparando atualização...";
-                UpdateButton.IsEnabled = false;
-                CheckButton.IsEnabled = false;
-                
-                await PerformUpdateAsync();
-            }
-        }
+        // REMOVIDO: UpdateButton_Click - Substituído por OpenDownloadLink_Click para abordagem manual
+// O método antigo fazia download e instalação automática, o que causava problemas de permissão
+// e complexidade desnecessária. A nova abordagem abre o link do GitHub para download manual.
 
         private async Task PerformUpdateAsync()
         {
