@@ -1,4 +1,5 @@
-﻿<UserControl x:Class="KitLugia.GUI.Controls.LugiaConfirmationOverlay"
+﻿<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="KitLugia.GUI.Controls.LugiaConfirmationOverlay"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
