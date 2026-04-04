@@ -19,7 +19,6 @@ namespace KitLugia.GUI.Pages
 {
     public partial class UpdatePage : Page
     {
-        private bool _isUpdating = false;
         private GitHubUpdater.ReleaseInfo? _latestRelease;
 
         public UpdatePage()
@@ -1087,8 +1086,9 @@ del ""%~f0"" >nul 2>&1";
         private string CreateUpdateScript(string newExePath, string currentExePath, string extractDir)
         {
             var scriptPath = Path.Combine(Path.GetTempPath(), "update_kitlugia.bat");
-            var currentDir = Path.GetDirectoryName(currentExePath);
-            var sourceDir = Path.GetDirectoryName(newExePath);
+            // ✅ CORREÇÃO: Adicionar null checks para evitar CS8604
+            var currentDir = Path.GetDirectoryName(currentExePath) ?? AppContext.BaseDirectory;
+            var sourceDir = Path.GetDirectoryName(newExePath) ?? AppContext.BaseDirectory;
             
             // Corrigir: se currentExePath for .dll, mudar para .exe
             if (currentExePath.EndsWith(".dll"))
@@ -1096,8 +1096,8 @@ del ""%~f0"" >nul 2>&1";
                 currentExePath = currentExePath.Replace(".dll", ".exe");
             }
             
-            // Criar arquivo de controle na pasta do KitLugia
-            var controlFile = Path.Combine(currentDir, "kitlugia_update_control.txt");
+            // ✅ CORREÇÃO: Garantir que currentDir não seja null
+            var controlFile = Path.Combine(currentDir ?? AppContext.BaseDirectory, "kitlugia_update_control.txt");
             File.WriteAllText(controlFile, $"KITLUGIA_EXE={currentExePath}\nKITLUGIA_DIR={currentDir}\nKITLUGIA_ARGS=--tray");
             
             var script = $@"

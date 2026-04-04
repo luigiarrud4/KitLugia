@@ -632,8 +632,8 @@ namespace KitLugia.GUI.Pages
             PanelProgress.Visibility = Visibility.Visible;
             BdrSafetyWarning.Visibility = Visibility.Visible;
             PanelLiveActivity.Visibility = Visibility.Visible;
-            TxtOpTitle.Text = "EXECUTANDO OPERAÇÃO";
-            TxtOpDesc.Text = "Aguarde enquanto as alterações são aplicadas...";
+            TxtOpTitle.Text = "EXECUTANDO OPERACAO";
+            TxtOpDesc.Text = "Aguarde enquanto as alteracoes sao aplicadas...";
             TxtOpStatus.Text = "Status: Processando...";
         }
 
