@@ -800,10 +800,10 @@ namespace KitLugia.Core
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    // DISM costuma emitir Unicode/UTF-8; Diskpart/Robocopy em PT-BR usam OEM.
-                    // Como este helper é usado para ambos, escolhemos UTF-8 e fazemos FixEncoding no output.
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
+                    // DISM costuma emitir Unicode/UTF-8; Diskpart/Robocopy em PT-BR usam OEM (CP850).
+                    // Usamos OEM encoding para garantir acentos corretos em português.
+                    StandardOutputEncoding = Encoding.GetEncoding(850), // CP850 - OEM Latin-1
+                    StandardErrorEncoding = Encoding.GetEncoding(850)    // CP850 - OEM Latin-1
                 };
 
                 using var proc = new Process { StartInfo = psi };
