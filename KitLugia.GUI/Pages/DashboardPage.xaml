@@ -120,6 +120,95 @@ Title="Sistema">
                     </Button>
                 </Grid>
                 
+                <!-- === SEÇÃO: GAMING LATENCY PROFILE === -->
+                <TextBlock Text="Gaming Latency Profile (Baixa Latência)" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                <Grid Margin="0,0,0,30">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- BOTÃO 1: GAMING LATENCY PROFILE (DOURO/ÂMBAR) -->
+                    <Button Grid.Column="0" Height="90" Click="BtnOpenLatencyMenu_Click" Cursor="Hand" ToolTip="Abre o menu de otimização de latência para gaming (estilo Khorvie)">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#10FFD700" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Ícone -->
+                                        <Border Background="#15FFD700" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="⚡" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="GAMING LATENCY" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Baixa Latência" Foreground="#FFD700" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Otimiza DPC/ISR, timers e input para mínima latência." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#25FFD700"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#FFD700"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#FFD700" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <!-- BOTÃO 2: REVERTER LATENCY (CINZA) -->
+                    <Button Grid.Column="2" Height="90" Click="BtnRevertLatency_Click" Cursor="Hand" ToolTip="Remove todas as otimizações de latência e volta ao padrão do Windows.">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#10666666" BorderBrush="#33666666" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Ícone -->
+                                        <Border Background="#15666666" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="↩️" FontSize="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="REVERTER LATENCY" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Padrão Windows" Foreground="#999" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Restaura Win32Priority, Core Parking e timers." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#25666666"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#666666"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#666666" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+                
                 <!-- A LISTA DE CARTÕES (NAVEGAÇÃO) -->
                 <TextBlock Text="Gerenciamento Manual" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
 
@@ -222,6 +311,252 @@ Title="Sistema">
                         <Button Grid.Column="0" Content="CANCELAR" Height="35" Background="Transparent" BorderBrush="#444" Click="BtnCancelQuickMenu_Click" Foreground="#AAA"/>
                         <Button Grid.Column="2" Content="OTIMIZAR AGORA" Height="35" Background="#4CAF50" BorderThickness="0" Click="BtnApplyCustomOptimization_Click" Foreground="White" FontWeight="Bold"/>
                     </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- OVERLAY: GAMING LATENCY MENU -->
+        <Grid x:Name="OverlayLatencyMenu" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="650" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                    Background="#1E1E1E" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="12" MaxHeight="750">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                    <TextBlock Text="Gaming Latency Profile" FontSize="20" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,5"/>
+                    <TextBlock Text="Otimize DPC/ISR, timers e input para latência mínima" FontSize="11" Foreground="#999" Margin="0,0,0,20"/>
+
+                    <!-- LATENCY ANALYZER SECTION -->
+                    <Border Background="#2A2A2A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="📊 Análise de Latência" Foreground="#FFD700" FontSize="14" FontWeight="Bold"/>
+                                    <TextBlock Text="Meça DPC/ISR e obtenha recomendações" FontSize="10" Foreground="#888"/>
+                                </StackPanel>
+                                <Button x:Name="BtnScanLatency" Grid.Column="1" Content="ANALISAR" Height="30" Width="90" 
+                                        Background="#FFD700" Foreground="Black" BorderThickness="0"
+                                        Click="BtnScanLatency_Click" FontSize="11" FontWeight="Bold"/>
+                            </Grid>
+                            
+                            <!-- Progress Bar -->
+                            <ProgressBar x:Name="ProgressLatencyScan" Height="4" Background="#333" Foreground="#FFD700" 
+                                         Visibility="Collapsed" Margin="0,0,0,10"/>
+                            
+                            <!-- Results Panel -->
+                            <StackPanel x:Name="PanelLatencyResults" Visibility="Collapsed">
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="0,0,4,0">
+                                        <StackPanel>
+                                            <TextBlock Text="ATUAL" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtCurrentLatency" Text="--" FontSize="16" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="µs" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="2,0,2,0">
+                                        <StackPanel>
+                                            <TextBlock Text="MÉDIA" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtAvgLatency" Text="--" FontSize="16" Foreground="#4CAF50" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="µs" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="4,0,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="MÁX" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtMaxLatency" Text="--" FontSize="16" Foreground="#FF5722" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="µs" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                
+                                <TextBlock x:Name="TxtLatencyRecommendation" Text="" FontSize="10" Foreground="#AAA" 
+                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                
+                                <Button x:Name="BtnApplyRecommended" Content="APLICAR RECOMENDAÇÕES" Height="32" 
+                                        Background="#4CAF50" Foreground="White" BorderThickness="0"
+                                        Click="BtnApplyRecommended_Click" FontSize="11" FontWeight="Bold" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- Win32PrioritySeparation SELETOR -->
+                    <TextBlock Text="Win32PrioritySeparation (Scheduling):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5" FontWeight="SemiBold"/>
+                    <TextBlock Text="Controla a prioridade de aplicações em foreground" FontSize="10" Foreground="#666" Margin="0,0,0,8"/>
+                    <ComboBox x:Name="CmbWin32Priority" Height="35" Margin="0,0,0,15" 
+                              Style="{StaticResource DarkComboBoxStyle}" SelectedIndex="1">
+                        <ComboBoxItem Content="0x18 (24) - Padrão Windows" Foreground="White"/>
+                        <ComboBoxItem Content="0x26 (38) - Foreground Boost (Recomendado)" Foreground="White"/>
+                        <ComboBoxItem Content="0x2A (42) - Máximo Foreground (Avançado)" Foreground="White"/>
+                    </ComboBox>
+
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- TWEAKS INDIVIDUAIS COM TOGGLES -->
+                    <TextBlock Text="Tweaks Individuais (Toggle ON/OFF):" Foreground="#AAA" FontSize="12" Margin="0,0,0,10" FontWeight="SemiBold"/>
+
+                    <!-- Core Parking Toggle -->
+                    <Border x:Name="BorderCoreParking" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorCoreParking" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Core Parking Disable" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Mantém todos os cores CPU ativos" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleCoreParking" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleCoreParking_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Timer Coalescing Toggle -->
+                    <Border x:Name="BorderTimerCoalescing" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorTimerCoalescing" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Timer Coalescing Disable" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Timers de alta precisão (melhor para jogos)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleTimerCoalescing" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleTimerCoalescing_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Input Queue Toggle -->
+                    <Border x:Name="BorderInputQueue" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorInputQueue" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Input Queue Optimize" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Aumenta buffer de mouse/teclado (30 vs 100)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleInputQueue" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleInputQueue_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Global Timer Toggle -->
+                    <Border x:Name="BorderGlobalTimer" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorGlobalTimer" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Global Timer Resolution" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Permite apps pedir timers precisos (1ms)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleGlobalTimer" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleGlobalTimer_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- System Responsiveness Toggle -->
+                    <Border x:Name="BorderSysResp" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,15">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorSysResp" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="SystemResponsiveness Gaming" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="0 = Máxima performance (desativa background)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleSysResp" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleSysResp_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- STATUS DOS TWEAKS -->
+                    <TextBlock Text="Status Atual:" Foreground="#AAA" FontSize="11" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="TxtLatencyStatus" Text="Verificando..." FontSize="10" Foreground="#888" Margin="0,0,0,15" TextWrapping="Wrap"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="FECHAR" Height="35" Background="Transparent" BorderBrush="#444" Click="BtnCancelLatencyMenu_Click" Foreground="#AAA"/>
+                        <Button Grid.Column="2" Content="APLICAR TODOS" Height="35" Background="#FFD700" BorderThickness="0" Click="BtnApplyAllLatency_Click" Foreground="Black" FontWeight="Bold"/>
+                        <Button Grid.Column="4" Content="REVERTER" Height="35" Background="Transparent" BorderBrush="#F44336" Click="BtnRevertLatencyMenu_Click" Foreground="#F44336"/>
+                    </Grid>
+                </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- LOADING OVERLAY PARA BENCHMARK -->
+        <Grid x:Name="LoadingOverlayBenchmark" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                    Background="#1E1E1E" BorderBrush="#FFD700" BorderThickness="2" CornerRadius="12" Padding="30">
+                <StackPanel>
+                    <!-- Spinner -->
+                    <TextBlock Text="⏳" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    
+                    <!-- Título -->
+                    <TextBlock Text="BENCHMARK EM ANDAMENTO" FontSize="18" FontWeight="Bold" 
+                               Foreground="#FFD700" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    
+                    <!-- Descrição -->
+                    <TextBlock Text="Testando múltiplos perfis de performance..." FontSize="12" 
+                               Foreground="#AAA" HorizontalAlignment="Center" Margin="0,0,0,20" TextWrapping="Wrap"/>
+                    
+                    <!-- Progress Bar -->
+                    <ProgressBar x:Name="ProgressBarBenchmark" Height="8" Background="#333" Foreground="#FFD700" 
+                                Minimum="0" Maximum="100" Value="0" Margin="0,0,0,15"/>
+                    
+                    <!-- Status Text -->
+                    <TextBlock x:Name="TxtBenchmarkStatus" Text="Iniciando..." FontSize="11" 
+                               Foreground="#888" HorizontalAlignment="Center" Margin="0,0,0,10" TextWrapping="Wrap"/>
+                    
+                    <!-- Log Console -->
+                    <Border Background="#0A0A0A" CornerRadius="4" Padding="10" Margin="0,10,0,0" Height="120">
+                        <ScrollViewer x:Name="ScrollViewerBenchmarkLog" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtBenchmarkLog" Text="" FontSize="10" 
+                                       Foreground="#4CAF50" FontFamily="Consolas" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                    
+                    <!-- Cancel Button -->
+                    <Button x:Name="BtnCancelBenchmark" Content="CANCELAR" Height="35" Margin="0,15,0,0"
+                            Background="Transparent" BorderBrush="#F44336" Foreground="#F44336"
+                            Click="BtnCancelBenchmark_Click"/>
                 </StackPanel>
             </Border>
         </Grid>
