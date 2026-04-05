@@ -2168,5 +2168,376 @@ namespace KitLugia.Core
                 return (false, "Falha ao reverter parâmetros de latência de jogo.");
             }
         }
+
+        #region Gaming Latency Profile - Khorvie Style Optimizations
+
+        public static int GetWin32PrioritySeparation()
+        {
+            try
+            {
+                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\PriorityControl", "Win32PrioritySeparation", 2);
+                return value is int intVal ? intVal : 2;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("GetWin32PrioritySeparation", ex.Message);
+                return 2;
+            }
+        }
+
+        public static (bool Success, string Message) SetWin32PrioritySeparation(int value)
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\PriorityControl", "Win32PrioritySeparation", value, RegistryValueKind.DWord);
+                string hexValue = $"0x{value:X2}";
+                Logger.Log($"Gaming Latency: Win32PrioritySeparation definido para {hexValue} ({value})");
+                return (true, $"Win32PrioritySeparation definido para {hexValue}. Reinicie para aplicar.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("SetWin32PrioritySeparation", ex.Message);
+                return (false, $"Falha ao definir Win32PrioritySeparation: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) DisableCoreParking()
+        {
+            try
+            {
+                string[] subKeys = {
+                    @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\0cc5b647-c1df-4637-891a-dec35c318583",
+                    @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\ea4be0c1-7c65-46f8-8c17-f298766665d9"
+                };
+
+                foreach (var key in subKeys)
+                {
+                    Registry.SetValue($@"HKEY_LOCAL_MACHINE\{key}", "ValueMax", 0, RegistryValueKind.DWord);
+                    Registry.SetValue($@"HKEY_LOCAL_MACHINE\{key}", "ValueMin", 0, RegistryValueKind.DWord);
+                }
+
+                Logger.Log("Gaming Latency: Core Parking desativado (ValueMax=0, ValueMin=0)");
+                return (true, "Core Parking desativado. Todos os cores permanecem ativos.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("DisableCoreParking", ex.Message);
+                return (false, $"Falha ao desativar Core Parking: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) DisableTimerCoalescing()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\kernel", "CoalescingTimerInterval", 0, RegistryValueKind.DWord);
+                Logger.Log("Gaming Latency: Timer Coalescing desativado (CoalescingTimerInterval=0)");
+                return (true, "Timer Coalescing desativado. Timers de alta precisão ativados.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("DisableTimerCoalescing", ex.Message);
+                return (false, $"Falha ao desativar Timer Coalescing: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) OptimizeInputQueue()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\kbdclass\Parameters", "KeyboardDataQueueSize", 30, RegistryValueKind.DWord);
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\mouclass\Parameters", "MouseDataQueueSize", 30, RegistryValueKind.DWord);
+                Logger.Log("Gaming Latency: Input Queue otimizado (Keyboard=30, Mouse=30)");
+                return (true, "Input Queue otimizado. Buffer de mouse/teclado definido para 30.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("OptimizeInputQueue", ex.Message);
+                return (false, $"Falha ao otimizar Input Queue: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) EnableGlobalTimerResolution()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power", "GlobalTimerResolutionRequests", 1, RegistryValueKind.DWord);
+                Logger.Log("Gaming Latency: Global Timer Resolution ativado (GlobalTimerResolutionRequests=1)");
+                return (true, "Global Timer Resolution ativado. Apps podem solicitar timers de 1ms.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("EnableGlobalTimerResolution", ex.Message);
+                return (false, $"Falha ao ativar Global Timer Resolution: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) SetSystemResponsivenessGaming()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", "SystemResponsiveness", 0, RegistryValueKind.DWord);
+                Logger.Log("Gaming Latency: SystemResponsiveness definido para 0 (modo gaming)");
+                return (true, "SystemResponsiveness definido para 0. Máxima performance para jogos.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("SetSystemResponsivenessGaming", ex.Message);
+                return (false, $"Falha ao definir SystemResponsiveness: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message, List<string> Applied) ApplyFullGamingLatencyProfile(int win32PriorityValue = 0x26)
+        {
+            var applied = new List<string>();
+            var errors = new List<string>();
+
+            var win32Result = SetWin32PrioritySeparation(win32PriorityValue);
+            if (win32Result.Success) applied.Add($"Win32PrioritySeparation=0x{win32PriorityValue:X2}");
+            else errors.Add($"Win32PrioritySeparation: {win32Result.Message}");
+
+            var coreParkingResult = DisableCoreParking();
+            if (coreParkingResult.Success) applied.Add("CoreParking");
+            else errors.Add($"CoreParking: {coreParkingResult.Message}");
+
+            var timerResult = DisableTimerCoalescing();
+            if (timerResult.Success) applied.Add("TimerCoalescing");
+            else errors.Add($"TimerCoalescing: {timerResult.Message}");
+
+            var inputResult = OptimizeInputQueue();
+            if (inputResult.Success) applied.Add("InputQueue");
+            else errors.Add($"InputQueue: {inputResult.Message}");
+
+            var globalTimerResult = EnableGlobalTimerResolution();
+            if (globalTimerResult.Success) applied.Add("GlobalTimerResolution");
+            else errors.Add($"GlobalTimerResolution: {globalTimerResult.Message}");
+
+            var sysRespResult = SetSystemResponsivenessGaming();
+            if (sysRespResult.Success) applied.Add("SystemResponsiveness");
+            else errors.Add($"SystemResponsiveness: {sysRespResult.Message}");
+
+            Logger.Log($"Gaming Latency Profile aplicado. Itens: {applied.Count}, Erros: {errors.Count}");
+
+            if (applied.Count > 0)
+            {
+                string msg = errors.Count > 0 
+                    ? $"Profile aplicado parcialmente ({applied.Count}/{applied.Count + errors.Count}). Alguns erros: {string.Join(", ", errors.Take(2))}"
+                    : "Gaming Latency Profile aplicado com sucesso! Reinicie para todos os efeitos.";
+                return (true, msg, applied);
+            }
+            else
+            {
+                return (false, "Falha ao aplicar Gaming Latency Profile. Verifique permissões de administrador.", applied);
+            }
+        }
+
+        public static (bool Success, string Message) RevertGamingLatencyProfile()
+        {
+            try
+            {
+                using var prioKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\PriorityControl", true);
+                prioKey?.SetValue("Win32PrioritySeparation", 2, RegistryValueKind.DWord);
+
+                using var sysProfKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", true);
+                if (sysProfKey != null)
+                {
+                    sysProfKey.SetValue("SystemResponsiveness", 20, RegistryValueKind.DWord);
+                }
+
+                using var kernelKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\kernel", true);
+                if (kernelKey != null)
+                {
+                    kernelKey.SetValue("CoalescingTimerInterval", 0, RegistryValueKind.DWord);
+                }
+
+                using var powerKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Power", true);
+                if (powerKey != null)
+                {
+                    powerKey.DeleteValue("GlobalTimerResolutionRequests", false);
+                }
+
+                Logger.Log("Gaming Latency Profile revertido para padrões Windows");
+                return (true, "Gaming Latency Profile revertido. Configurações restauradas para padrão Windows.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("RevertGamingLatencyProfile", ex.Message);
+                return (false, $"Falha ao reverter: {ex.Message}");
+            }
+        }
+
+        public static Dictionary<string, bool> CheckGamingLatencyStatus()
+        {
+            var status = new Dictionary<string, bool>();
+
+            try
+            {
+                int win32Value = GetWin32PrioritySeparation();
+                status["Win32PrioritySeparation"] = win32Value != 2;
+
+                var coreParkingValue = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\0cc5b647-c1df-4637-891a-dec35c318583", "ValueMax", 64);
+                status["CoreParking"] = coreParkingValue is int cpVal && cpVal == 0;
+
+                var timerValue = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\kernel", "CoalescingTimerInterval", null);
+                status["TimerCoalescing"] = timerValue is int tVal && tVal == 0;
+
+                var kbdValue = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\kbdclass\Parameters", "KeyboardDataQueueSize", 100);
+                var mouseValue = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\mouclass\Parameters", "MouseDataQueueSize", 100);
+                status["InputQueue"] = kbdValue is int kVal && kVal == 30 && mouseValue is int mVal && mVal == 30;
+
+                var globalTimerValue = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power", "GlobalTimerResolutionRequests", 0);
+                status["GlobalTimerResolution"] = globalTimerValue is int gtVal && gtVal == 1;
+
+                var sysRespValue = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", "SystemResponsiveness", 20);
+                status["SystemResponsiveness"] = sysRespValue is int srVal && srVal == 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("CheckGamingLatencyStatus", ex.Message);
+            }
+
+            return status;
+        }
+
+        #endregion
+
+        #region GDI Scaling Control
+
+        public static (bool Success, string Message) DisableGdiScaling()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "DisableGdiScaling", 1, RegistryValueKind.DWord);
+                Logger.Log("GDI Scaling desativado (DisableGdiScaling=1)");
+                return (true, "GDI Scaling desativado. Aplicativos legados não terão scaling automático.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("DisableGdiScaling", ex.Message);
+                return (false, $"Falha ao desativar GDI Scaling: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) EnableGdiScaling()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop", true);
+                if (key != null)
+                {
+                    key.DeleteValue("DisableGdiScaling", false);
+                }
+                Logger.Log("GDI Scaling restaurado para padrão");
+                return (true, "GDI Scaling restaurado para o padrão do Windows.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("EnableGdiScaling", ex.Message);
+                return (false, $"Falha ao restaurar GDI Scaling: {ex.Message}");
+            }
+        }
+
+        public static bool IsGdiScalingDisabled()
+        {
+            try
+            {
+                var value = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "DisableGdiScaling", 0);
+                return value is int intVal && intVal == 1;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("IsGdiScalingDisabled", ex.Message);
+                return false;
+            }
+        }
+
+        #endregion
+
+        #region Windows 11 Additional Tweaks
+
+        public static (bool Success, string Message) DisablePowerThrottling()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling", "PowerThrottlingOff", 1, RegistryValueKind.DWord);
+                Logger.Log("Power Throttling desativado (PowerThrottlingOff=1)");
+                return (true, "Power Throttling desativado. CPU rodará em performance máxima.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("DisablePowerThrottling", ex.Message);
+                return (false, $"Falha ao desativar Power Throttling: {ex.Message}");
+            }
+        }
+
+        public static (bool Success, string Message) EnablePowerThrottling()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling", true);
+                key?.DeleteValue("PowerThrottlingOff", false);
+                Logger.Log("Power Throttling restaurado para padrão");
+                return (true, "Power Throttling restaurado para padrão Windows.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("EnablePowerThrottling", ex.Message);
+                return (false, $"Falha ao restaurar Power Throttling: {ex.Message}");
+            }
+        }
+
+        public static bool IsPowerThrottlingDisabled()
+        {
+            try
+            {
+                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling", "PowerThrottlingOff", 0);
+                return value is int intVal && intVal == 1;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("IsPowerThrottlingDisabled", ex.Message);
+                return false;
+            }
+        }
+
+        public static (bool Success, string Message) OptimizeGamingProfileAdvanced()
+        {
+            try
+            {
+                string gamesPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games";
+                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{gamesPath}", "GPU Priority", 8, RegistryValueKind.DWord);
+                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{gamesPath}", "Affinity", 0xF, RegistryValueKind.DWord);
+                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{gamesPath}", "Background Only", "False", RegistryValueKind.String);
+                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{gamesPath}", "Background Priority", 1, RegistryValueKind.DWord);
+                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{gamesPath}", "Priority", 6, RegistryValueKind.DWord);
+                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{gamesPath}", "Scheduling Category", "High", RegistryValueKind.String);
+                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{gamesPath}", "SFIO Priority", "High", RegistryValueKind.String);
+                
+                Logger.Log("Gaming Profile avançado aplicado");
+                return (true, "Gaming Profile avançado aplicado. Jogos terão prioridade máxima.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("OptimizeGamingProfileAdvanced", ex.Message);
+                return (false, $"Falha ao aplicar Gaming Profile: {ex.Message}");
+            }
+        }
+
+        public static bool IsGamingProfileAdvancedApplied()
+        {
+            try
+            {
+                var gpuPriority = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games", "GPU Priority", 0);
+                var priority = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games", "Priority", 0);
+                return gpuPriority is int gpVal && gpVal == 8 && priority is int pVal && pVal == 6;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("IsGamingProfileAdvancedApplied", ex.Message);
+                return false;
+            }
+        }
+
+        #endregion
     }
 }

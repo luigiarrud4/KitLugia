@@ -216,6 +216,16 @@ namespace KitLugia.Core
             Category = "Estabilidade", Type = TweakType.PageFile
         },
         new() {
+            Name = "LargeSystemCache (Cache de Sistema Grande)",
+            Description = "Configuração que força o Windows a manter um cache de sistema muito grande. CAUSA MEMORY LEAKS frequentes e consumo excessivo de RAM, degradando performance ao longo do tempo.",
+            Category = "Estabilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "LargeSystemCache", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
+            Name = "DisablePagingExecutive (Desativar Paginação de Executáveis)",
+            Description = "Impede que drivers e executáveis de sistema sejam paginados para o disco. CAUSA INSTABILIDADE SEVERA, crashes e erros de memória insuficiente em sistemas com uso intenso.",
+            Category = "Estabilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "DisablePagingExecutive", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
             Name = "Hibernação (Fast Startup)",
             Description = "Necessário para a Inicialização Rápida do Windows funcionar. Se desativado, o boot será mais lento.",
             Category = "Estabilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power", ValueName = "HibernateEnabled", HarmfulValue = 0, DefaultValue = 1
@@ -229,6 +239,11 @@ namespace KitLugia.Core
             Name = "Dynamic Tick (BCD)",
             Description = "Recurso de gerenciamento de energia da CPU. Desativá-lo (Yes) é um mito de performance antigo que não traz benefícios reais.",
             Category = "Estabilidade", Type = TweakType.Bcd, ValueName = "disabledynamictick", HarmfulValue = "Yes", DefaultValue = "No"
+        },
+        new() {
+            Name = "HPET (High Precision Event Timer) - Desativado",
+            Description = "Desativar o HPET completamente pode piorar a precisão dos timers do sistema e causar instabilidade em aplicações que dependem de timing preciso. O Windows gerencia isso automaticamente.",
+            Category = "Estabilidade", Type = TweakType.Bcd, ValueName = "useplatformclock", HarmfulValue = "No", DefaultValue = "Yes"
         },
         
         // ==================================================================================
