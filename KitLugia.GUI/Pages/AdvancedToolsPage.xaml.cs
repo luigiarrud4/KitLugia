@@ -28,6 +28,21 @@ namespace KitLugia.GUI.Pages
         public AdvancedToolsPage()
         {
             InitializeComponent();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += AdvancedToolsPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            _selectedIsoPath = string.Empty;
+            _mountedDrive = string.Empty;
+            this.Unloaded -= AdvancedToolsPage_Unloaded;
+        }
+
+        private void AdvancedToolsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         // ==========================================
@@ -84,7 +99,8 @@ namespace KitLugia.GUI.Pages
         // ==========================================
         private void BtnWinboot_Click(object sender, RoutedEventArgs e)
         {
-            NavigationService.Navigate(new WinbootPage());
+            var mw = Application.Current.MainWindow as MainWindow;
+            mw?.NavigateToPage("💻");
         }
 
         // ==========================================
@@ -92,7 +108,8 @@ namespace KitLugia.GUI.Pages
         // ==========================================
         private void BtnOpenPartitions_Click(object sender, RoutedEventArgs e)
         {
-            NavigationService.Navigate(new PartitionsPage());
+            var mw = Application.Current.MainWindow as MainWindow;
+            mw?.NavigateToPage("💽");
         }
     }
 }

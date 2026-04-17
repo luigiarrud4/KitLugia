@@ -15,10 +15,31 @@ namespace KitLugia.GUI.Pages
         private string _currentQuery = "";
         private CancellationTokenSource? _cts; // Token para cancelar tarefas antigas
       
-    public GlobalSearchPage(string query = "")
+        public GlobalSearchPage(string query = "")
         {
             InitializeComponent();
             UpdateSearch(query);
+
+            // 🔥 LIMPEZA: Cancela operações ao sair da página
+            this.Unloaded += GlobalSearchPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // Cancela e libera recursos
+            if (_cts != null)
+            {
+                _cts.Cancel();
+                _cts.Dispose();
+                _cts = null;
+            }
+            this.Unloaded -= GlobalSearchPage_Unloaded;
+        }
+
+        private void GlobalSearchPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         public void UpdateSearch(string query)

@@ -24,6 +24,21 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             LoadApps();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += BloatwarePage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            AppsCollection?.Clear();
+            AppsList.ItemsSource = null;
+            this.Unloaded -= BloatwarePage_Unloaded;
+        }
+
+        private void BloatwarePage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private async Task LoadApps()

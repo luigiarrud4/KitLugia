@@ -21,6 +21,19 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             _ = LoadCurrentStatus();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += TweaksPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            this.Unloaded -= TweaksPage_Unloaded;
+        }
+
+        private void TweaksPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private async Task LoadCurrentStatus()

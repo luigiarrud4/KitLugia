@@ -15,6 +15,19 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             LoadStats();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += GamesPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            this.Unloaded -= GamesPage_Unloaded;
+        }
+
+        private void GamesPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private async Task LoadStats()

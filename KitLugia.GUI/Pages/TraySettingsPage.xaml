@@ -2,287 +2,413 @@
 <Page x:Class="KitLugia.GUI.Pages.TraySettingsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="KitLugia RAM Monitor &amp; Optimizer">
+      Title="Monitor de RAM">
+    
+    <Page.Resources>
+        <Style x:Key="TrayCard" TargetType="Border">
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="15"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        
+        <Style x:Key="TrayToggle" TargetType="CheckBox">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="toggleBorder" 
+                                Background="#3E3E3E" 
+                                CornerRadius="12"
+                                BorderThickness="1"
+                                BorderBrush="#505050">
+                            <Ellipse x:Name="toggleCircle" 
+                                     Width="14" Height="14"
+                                     Fill="#BBBBBB"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center"
+                                     Margin="4,0">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect ShadowDepth="1" BlurRadius="2" Opacity="0.3"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="toggleBorder" Property="Background" Value="{StaticResource AccentColor}"/>
+                                <Setter TargetName="toggleBorder" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                <Setter TargetName="toggleCircle" Property="Fill" Value="#101010"/>
+                                <Setter TargetName="toggleCircle" Property="HorizontalAlignment" Value="Right"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
 
-    <Grid Background="#121212">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- HEADER -->
-        <Border Grid.Row="0" Background="#1A1A1A" BorderBrush="#333" BorderThickness="0,0,0,1" Padding="25,20">
-            <Grid>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
+            
+            <!-- Header -->
+            <TextBlock Text="📡 MONITOR DE RAM" 
+                       FontSize="20" 
+                       FontWeight="Bold" 
+                       Margin="0,0,0,15"
+                       Foreground="{StaticResource AccentColor}"/>
+            
+            <!-- Seção: Estatísticas -->
+            <Border Style="{StaticResource TrayCard}">
                 <StackPanel>
-                    <TextBlock Text="MONITOR DE RAM" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
-                    <TextBlock Text="KitLugia Memory Optimizer" FontSize="26" FontWeight="Bold" Foreground="White" Margin="0,2,0,0"/>
-                </StackPanel>
-                
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock Text="ÍCONE NA BANDEJA" Foreground="#888" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="12"/>
-                    <CheckBox x:Name="ChkEnableTray" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True" Click="ChkEnableTray_Click"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <Grid Margin="25">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="380"/>
-                    <ColumnDefinition Width="25"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- LEFT COLUMN: REAL-TIME STATS & MODES -->
-                <StackPanel Grid.Column="0">
+                    <TextBlock Text="ESTATÍSTICAS" 
+                               FontSize="12" 
+                               FontWeight="Bold" 
+                               Foreground="#666"
+                               Margin="0,0,0,10"/>
                     
-                    <!-- REAL-TIME RAM STATS -->
-                    <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20">
-                        <StackPanel>
-                            <TextBlock Text="ESTATÍSTICAS DO SISTEMA" FontSize="12" FontWeight="Bold" Foreground="#666" Margin="0,0,0,15"/>
-                            
-                            <Grid Margin="0,0,0,20">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <Border Width="70" Height="70" Background="#252525" CornerRadius="35" BorderBrush="{StaticResource AccentColor}" BorderThickness="3">
-                                    <TextBlock x:Name="TxtPercentMain" Text="--%" Foreground="White" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0">
-                                    <TextBlock x:Name="TxtStatusText" Text="ESTADO: NORMAL" Foreground="#4CAF50" FontWeight="Bold" FontSize="14"/>
-                                    <TextBlock x:Name="TxtFreedLast" Text="Última limpeza: --" Foreground="#888" FontSize="11" Margin="0,2,0,0"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Separator Background="#333" Margin="0,0,0,15"/>
-
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="Memória Total:" Foreground="#AAA"/>
-                                <TextBlock x:Name="TxtTotalRam" Text="-- GB" Foreground="White" HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                            </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="Memória Usada:" Foreground="#AAA"/>
-                                <TextBlock x:Name="TxtUsedRam" Text="-- GB" Foreground="White" HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                            </Grid>
-                            <Grid>
-                                <TextBlock Text="Memória Livre:" Foreground="#AAA"/>
-                                <TextBlock x:Name="TxtFreeRam" Text="-- GB" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Right" FontWeight="Bold"/>
-                            </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <Border Width="80" Height="80" 
+                                Background="#252525" 
+                                CornerRadius="40" 
+                                BorderBrush="{StaticResource AccentColor}" 
+                                BorderThickness="3"
+                                Grid.Column="0">
+                            <TextBlock x:Name="TxtPercentMain" 
+                                       Text="--%" 
+                                       Foreground="White" 
+                                       FontWeight="Bold" 
+                                       FontSize="22" 
+                                       HorizontalAlignment="Center" 
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                        
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0">
+                            <TextBlock x:Name="TxtStatusText" 
+                                       Text="ESTADO: NORMAL" 
+                                       Foreground="#4CAF50" 
+                                       FontWeight="Bold" 
+                                       FontSize="16"/>
+                            <TextBlock x:Name="TxtFreedLast" 
+                                       Text="Última limpeza: --" 
+                                       Foreground="#888" 
+                                       FontSize="12" 
+                                       Margin="0,5,0,0"/>
                         </StackPanel>
-                    </Border>
-
-                    <!-- CLEANING MODES -->
-                    <TextBlock Text="MODO DE LIMPEZA" FontSize="12" FontWeight="Bold" Foreground="#666" Margin="0,25,0,10"/>
-                    <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="5">
-                        <StackPanel>
-                            <RadioButton x:Name="ModeLeve" GroupName="CleanMode" Tag="Leve" IsChecked="False" Style="{StaticResource NavButtonStyle}" Padding="15,10" Click="Mode_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="💧 Leve" FontWeight="Bold" Width="80"/>
-                                    <TextBlock Text="(Apenas processos ativos - nem sente)" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="ModeNormal" GroupName="CleanMode" Tag="Normal" IsChecked="True" Style="{StaticResource NavButtonStyle}" Padding="15,10" Click="Mode_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="⚡ Normal" FontWeight="Bold" Width="80"/>
-                                    <TextBlock Text="(Padrão recomendado - equilibrado)" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="ModeAlta" GroupName="CleanMode" Tag="Alta" IsChecked="False" Style="{StaticResource NavButtonStyle}" Padding="15,10" Click="Mode_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🔥 Alta" FontWeight="Bold" Width="80"/>
-                                    <TextBlock Text="(Limpa Standby List - leve travada)" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="ModeBruta" GroupName="CleanMode" Tag="Bruta" IsChecked="False" Style="{StaticResource NavButtonStyle}" Padding="15,10" Click="Mode_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="💀 Bruta" FontWeight="Bold" Width="80"/>
-                                    <TextBlock Text="(Força TUDO - trava o sistema)" Foreground="#D32F2F" FontSize="11" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                        </StackPanel>
-                    </Border>
+                    </Grid>
                     
-                    <Button Content="BOOST AGORA 🚀" Height="50" Margin="0,20,0,0" 
-                            Background="{StaticResource AccentColor}" Foreground="Black" FontWeight="Bold" FontSize="16"
-                            Cursor="Hand" Click="BtnCleanNow_Click">
+                    <Separator Background="#333" Margin="0,0,0,10"/>
+                    
+                    <Grid Margin="0,3">
+                        <TextBlock Text="Memória Total:" Foreground="#AAA" FontSize="11"/>
+                        <TextBlock x:Name="TxtTotalRam" Text="-- GB" Foreground="White" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11"/>
+                    </Grid>
+                    <Grid Margin="0,3">
+                        <TextBlock Text="Memória Usada:" Foreground="#AAA" FontSize="11"/>
+                        <TextBlock x:Name="TxtUsedRam" Text="-- GB" Foreground="White" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11"/>
+                    </Grid>
+                    <Grid Margin="0,3">
+                        <TextBlock Text="Memória Livre:" Foreground="#AAA" FontSize="11"/>
+                        <TextBlock x:Name="TxtFreeRam" Text="-- GB" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Right" FontWeight="Bold" FontSize="11"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Seção: Modo de Limpeza -->
+            <Border Style="{StaticResource TrayCard}">
+                <StackPanel>
+                    <TextBlock Text="MODO DE LIMPEZA" 
+                               FontSize="12" 
+                               FontWeight="Bold" 
+                               Foreground="#666"
+                               Margin="0,0,0,10"/>
+                    
+                    <RadioButton x:Name="ModeLeve" GroupName="CleanMode" Tag="Leve" IsChecked="False" Style="{StaticResource NavButtonStyle}" Padding="12,8" Margin="0,3" Click="Mode_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💧 Leve" FontWeight="Bold" Width="70" FontSize="13"/>
+                            <TextBlock Text="(Apenas processos ativos)" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    
+                    <RadioButton x:Name="ModeNormal" GroupName="CleanMode" Tag="Normal" IsChecked="True" Style="{StaticResource NavButtonStyle}" Padding="12,8" Margin="0,3" Click="Mode_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚡ Normal" FontWeight="Bold" Width="70" FontSize="13"/>
+                            <TextBlock Text="(Padrão recomendado)" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    
+                    <RadioButton x:Name="ModeAlta" GroupName="CleanMode" Tag="Alta" IsChecked="False" Style="{StaticResource NavButtonStyle}" Padding="12,8" Margin="0,3" Click="Mode_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔥 Alta" FontWeight="Bold" Width="70" FontSize="13"/>
+                            <TextBlock Text="(Limpa Standby List)" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    
+                    <RadioButton x:Name="ModeBruta" GroupName="CleanMode" Tag="Bruta" IsChecked="False" Style="{StaticResource NavButtonStyle}" Padding="12,8" Margin="0,3" Click="Mode_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💀 Bruta" FontWeight="Bold" Width="70" FontSize="13"/>
+                            <TextBlock Text="(Força TUDO - trava)" Foreground="#D32F2F" FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    
+                    <Button Content="LIMPAR AGORA 🚀" 
+                            Height="40" 
+                            Margin="0,10,0,8" 
+                            Background="{StaticResource AccentColor}" 
+                            Foreground="Black" 
+                            FontWeight="Bold" 
+                            FontSize="13"
+                            Cursor="Hand" 
+                            Click="BtnCleanNow_Click"
+                            BorderThickness="0">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="bdr" CornerRadius="8" Background="{TemplateBinding Background}">
+                                <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="6">
                                     <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="bdr" Property="Background" Value="White"/>
+                                        <Setter TargetName="bdr" Property="Opacity" Value="1"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="False">
+                                        <Setter TargetName="bdr" Property="Opacity" Value="0.9"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    
+                    <Button Content="⚙️ Configurar Limpeza Automática" 
+                            Height="36" 
+                            Margin="0,0,0,0" 
+                            Background="Transparent" 
+                            Foreground="#888" 
+                            FontWeight="SemiBold" 
+                            FontSize="11"
+                            Cursor="Hand" 
+                            Click="BtnConfigureAutoClean_Click"
+                            BorderThickness="0"
+                            HorizontalAlignment="Center">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#15FFFFFF"/>
+                                        <Setter Property="Foreground" Value="White"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
                 </StackPanel>
-
-                <!-- RIGHT COLUMN: AUTOMATION & BACKGROUND FEATURES -->
-                <StackPanel Grid.Column="2">
+            </Border>
+            
+            <!-- Seção: Automação -->
+            <Border Style="{StaticResource TrayCard}">
+                <StackPanel>
+                    <TextBlock Text="AUTOMAÇÃO" 
+                               FontSize="12" 
+                               FontWeight="Bold" 
+                               Foreground="#666"
+                               Margin="0,0,0,10"/>
                     
-                    <!-- AUTOMATION SETTINGS -->
-                    <TextBlock Text="AUTOMAÇÃO E TRAY" FontSize="12" FontWeight="Bold" Foreground="#666" Margin="0,0,0,10"/>
-                    <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,20">
-                                <StackPanel>
-                                    <TextBlock Text="Auto-Limpeza Inteligente" FontWeight="Bold" Foreground="White"/>
-                                    <TextBlock Text="Aciona a limpeza ao atingir o limite" FontSize="11" Foreground="#888"/>
-                                </StackPanel>
-                                <CheckBox x:Name="ChkAutoClean" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" IsChecked="True" Click="ChkAutoClean_Click"/>
-                            </Grid>
-
-                            <TextBlock Text="Limite de Uso" FontSize="11" Foreground="#666" Margin="0,0,0,5"/>
-                            <Grid Margin="0,0,0,15">
-                                <Slider x:Name="SliderThreshold" Minimum="30" Maximum="95" Value="80" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SliderThreshold_ValueChanged"/>
-                                <TextBlock x:Name="TxtThreshold" Text="80%" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-25,0,0"/>
-                            </Grid>
-
-                            <TextBlock Text="Intervalo de Monitoramento" FontSize="11" Foreground="#666" Margin="0,0,0,5"/>
-                            <Grid>
-                                <Slider x:Name="SliderInterval" Minimum="1" Maximum="120" Value="30" TickFrequency="1" VerticalAlignment="Center" ValueChanged="SliderInterval_ValueChanged"/>
-                                <TextBlock x:Name="TxtInterval" Text="30s" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-25,0,0"/>
-                            </Grid>
-
-                            <Separator Background="#333" Margin="0,20"/>
-
-                            <Grid>
-                                <StackPanel>
-                                    <TextBlock Text="Iniciar com o Windows" FontWeight="Bold" Foreground="White"/>
-                                    <TextBlock Text="Carregar KitLugia Minimizado" FontSize="11" Foreground="#888"/>
-                                </StackPanel>
-                                <CheckBox x:Name="ChkAutoStart" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkAutoStart_Click"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- ADVANCED BACKGROUND FEATURES -->
-                    <TextBlock Text="OTIMIZAÇÕES EM SEGUNDO PLANO (MODO AGENTE)" FontSize="12" FontWeight="Bold" Foreground="#666" Margin="0,25,0,10"/>
-                    
-                    <Grid>
+                    <Grid Margin="0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="15"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <!-- Column 1 Features -->
                         <StackPanel Grid.Column="0">
-                            <!-- Game Priority -->
-                            <Border Background="#1A1A1A" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="15" Margin="0,0,0,10">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="🎮 Game Boost" FontWeight="Bold" Foreground="White"/>
-                                        <CheckBox x:Name="ChkGamePriority" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkBackgroundFeature_Click"/>
-                                    </Grid>
-                                    <TextBlock Text="Aumenta prioridade do jogo ativo" FontSize="10" Foreground="#666" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Standby Clean -->
-                            <Border Background="#1A1A1A" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="15" Margin="0,0,0,10">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="🧹 Standby Clean" FontWeight="Bold" Foreground="White"/>
-                                        <CheckBox x:Name="ChkStandbyClean" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" IsChecked="True" Click="ChkBackgroundFeature_Click"/>
-                                    </Grid>
-                                    <TextBlock Text="Evita acúmulo de lixo no Windows" FontSize="10" Foreground="#666" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
+                            <TextBlock Text="Ícone na Bandeja" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Mostrar ícone na bandeja" FontSize="11" Foreground="#888"/>
                         </StackPanel>
-
-                        <!-- Column 2 Features -->
-                        <StackPanel Grid.Column="2">
-                            <!-- Memory Leak Fix -->
-                            <Border Background="#1A1A1A" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="15" Margin="0,0,0,10">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="🔍 Anti-Leak" FontWeight="Bold" Foreground="White"/>
-                                        <CheckBox x:Name="ChkAntiLeak" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkBackgroundFeature_Click"/>
-                                    </Grid>
-                                    <TextBlock Text="Trima processos com alto consumo" FontSize="10" Foreground="#666" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Focus Assist -->
-                            <Border Background="#1A1A1A" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="15" Margin="0,0,0,10">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="🔕 Focar Agora" FontWeight="Bold" Foreground="White"/>
-                                        <CheckBox x:Name="ChkFocusAssist" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkBackgroundFeature_Click"/>
-                                    </Grid>
-                                    <TextBlock Text="Silencia Windows durante jogos" FontSize="10" Foreground="#666" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Turbo Boot -->
-                            <Border Background="#1A1A1A" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="15" Margin="0,0,0,10">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="🚀 Turbo Boot" FontWeight="Bold" Foreground="White"/>
-                                        <CheckBox x:Name="ChkTurboBoot" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkBackgroundFeature_Click"/>
-                                    </Grid>
-                                    <TextBlock Text="Ignora o delay de inicialização do Windows" FontSize="10" Foreground="#666" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Turbo Shutdown -->
-                            <Border Background="#1A1A1A" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="15" Margin="0,0,0,10">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="🛑 Turbo Shutdown" FontWeight="Bold" Foreground="White"/>
-                                        <CheckBox x:Name="ChkTurboShutdown" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkBackgroundFeature_Click"/>
-                                    </Grid>
-                                    <TextBlock Text="Fecha apps antes do Windows desligar" FontSize="10" Foreground="#666" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                        <CheckBox x:Name="ChkEnableTray" Grid.Column="1" Style="{StaticResource TrayToggle}" IsChecked="True" Click="ChkEnableTray_Click"/>
                     </Grid>
-
-                    <!-- DELEGATED STARTUP APPS LIST -->
-                    <TextBlock Text="APLICATIVOS NO TURBO BOOT" FontSize="12" FontWeight="Bold" Foreground="#666" Margin="0,25,0,10"/>
-                    <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="15">
-                        <StackPanel>
-                            <ItemsControl x:Name="ListTurboApps">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,0,0,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold"/>
-                                                <TextBlock Text="{Binding FullCommand}" Foreground="#666" FontSize="10" TextTrimming="CharacterEllipsis"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                <Button Content="⏪" Width="22" Height="22" Background="Transparent" Foreground="{StaticResource AccentColor}" BorderThickness="0" Cursor="Hand" Click="BtnRestoreTurboApp_Click" Tag="{Binding Name}" ToolTip="Restaurar para Inicialização Padrão"/>
-                                                <Button Content="✕" Width="22" Height="22" Background="Transparent" Foreground="#D32F2F" BorderThickness="0" Cursor="Hand" Click="BtnRemoveTurboApp_Click" Tag="{Binding Name}" ToolTip="Remover Permanentemente" Margin="5,0,0,0"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock x:Name="TxtEmptyTurbo" Text="Nenhum aplicativo delegado ao Turbo Boot." Foreground="#444" FontSize="11" HorizontalAlignment="Center" Margin="0,10" Visibility="Collapsed"/>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Auto-Limpeza" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Limpar ao atingir limite" FontSize="11" Foreground="#888"/>
                         </StackPanel>
-                    </Border>
-
-                    <!-- NOTE FOR USER -->
-                    <Border Background="#251A00" BorderBrush="#504000" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,10,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="ℹ️" FontSize="16" VerticalAlignment="Center" Margin="0,0,15,0"/>
-                            <TextBlock Text="O monitor roda em baixíssimo consumo. As otimizações de fundo ajudam a manter a responsividade mesmo em cenários de stress." 
-                                       Foreground="#B89000" FontSize="11" TextWrapping="Wrap" MaxWidth="350"/>
-                        </StackPanel>
-                    </Border>
+                        <CheckBox x:Name="ChkAutoClean" Grid.Column="1" Style="{StaticResource TrayToggle}" IsChecked="True" Click="ChkAutoClean_Click"/>
+                    </Grid>
+                    
+                    <TextBlock Text="Limite de Uso" FontSize="11" Foreground="#666" Margin="0,10,0,3"/>
+                    <Grid Margin="0,0,0,10">
+                        <Slider x:Name="SliderThreshold" Minimum="30" Maximum="95" Value="80" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SliderThreshold_ValueChanged"/>
+                        <TextBlock x:Name="TxtThreshold" Text="80%" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
+                    </Grid>
+                    
+                    <TextBlock Text="Intervalo de Monitoramento" FontSize="11" Foreground="#666" Margin="0,0,0,3"/>
+                    <Grid Margin="0,0,0,10">
+                        <Slider x:Name="SliderInterval" Minimum="5" Maximum="120" Value="30" TickFrequency="1" VerticalAlignment="Center" ValueChanged="SliderInterval_ValueChanged"/>
+                        <TextBlock x:Name="TxtInterval" Text="30s" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
+                    </Grid>
                 </StackPanel>
-            </Grid>
-        </ScrollViewer>
-    </Grid>
+            </Border>
+            
+            <!-- Seção: Comportamento ao Fechar -->
+            <Border Style="{StaticResource TrayCard}">
+                <StackPanel>
+                    <TextBlock Text="COMPORTAMENTO AO FECHAR" 
+                               FontSize="12" 
+                               FontWeight="Bold" 
+                               Foreground="#666"
+                               Margin="0,0,0,10"/>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Rodar em segundo plano" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Minimiza ao clicar no X (mantém ativo)" FontSize="11" Foreground="#888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkCloseToTray" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkBackgroundFeature_Click"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Iniciar com Windows" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Carregar minimizado" FontSize="11" Foreground="#888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkAutoStart" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkAutoStart_Click"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Mostrar ícone na bandeja" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Ícone na área de notificação" FontSize="11" Foreground="#888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkTrayIcon" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkBackgroundFeature_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Seção: Otimizações -->
+            <Border Style="{StaticResource TrayCard}">
+                <StackPanel>
+                    <TextBlock Text="OTIMIZAÇÕES EM SEGUNDO PLANO" 
+                               FontSize="12" 
+                               FontWeight="Bold" 
+                               Foreground="#666"
+                               Margin="0,0,0,10"/>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="🧹 Standby Clean" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Evita acúmulo de lixo" FontSize="11" Foreground="#888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkStandbyClean" Grid.Column="1" Style="{StaticResource TrayToggle}" IsChecked="True" Click="ChkBackgroundFeature_Click"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="� Turbo Boot" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Ignora delay inicialização" FontSize="11" Foreground="#888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkTurboBoot" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkBackgroundFeature_Click"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="🛑 Turbo Shutdown" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            <TextBlock Text="Fecha apps antes de desligar" FontSize="11" Foreground="#888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkTurboShutdown" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkBackgroundFeature_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Seção: Turbo Boot Apps -->
+            <Border Style="{StaticResource TrayCard}">
+                <StackPanel>
+                    <TextBlock Text="APLICATIVOS NO TURBO BOOT" 
+                               FontSize="12" 
+                               FontWeight="Bold" 
+                               Foreground="#666"
+                               Margin="0,0,0,10"/>
+                    
+                    <ItemsControl x:Name="ListTurboApps">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="11"/>
+                                        <TextBlock Text="{Binding FullCommand}" Foreground="#666" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="⏪" Width="24" Height="24" Background="Transparent" Foreground="{StaticResource AccentColor}" BorderThickness="0" Cursor="Hand" Click="BtnRestoreTurboApp_Click" Tag="{Binding Name}" ToolTip="Restaurar">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Opacity" Value="0.7"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Opacity" Value="1"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="✕" Width="24" Height="24" Background="Transparent" Foreground="#D32F2F" BorderThickness="0" Cursor="Hand" Click="BtnRemoveTurboApp_Click" Tag="{Binding Name}" ToolTip="Remover" Margin="4,0,0,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Opacity" Value="0.7"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Opacity" Value="1"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="TxtEmptyTurbo" Text="Nenhum aplicativo delegado ao Turbo Boot." Foreground="#666" FontSize="11" HorizontalAlignment="Center" Margin="0,8" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+            
+        </StackPanel>
+    </ScrollViewer>
 </Page>

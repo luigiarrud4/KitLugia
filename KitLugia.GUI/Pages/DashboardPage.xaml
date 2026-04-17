@@ -25,7 +25,7 @@ Title="Sistema">
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock x:Name="TxtPCName" Text="DESKTOP-NAME" FontSize="20" FontWeight="Bold"/>
-                            <TextBlock x:Name="TxtSpecs" Text="Carregando informações..." FontSize="14" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0"/>
+                            <TextBlock x:Name="TxtSpecs" Text="Carregando informações..." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
                             <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,3,0,0"/>
                         </StackPanel>
                     </Grid>
@@ -209,48 +209,122 @@ Title="Sistema">
                     </Button>
                 </Grid>
                 
-                <!-- A LISTA DE CARTÕES (NAVEGAÇÃO) -->
-                <TextBlock Text="Gerenciamento Manual" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+                <!-- A LISTA DE CARTÕES (NAVEGAÇÃO COMPLETA) -->
+                <TextBlock Text="Gerenciamento do Sistema" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+
+                <!-- OTIMIZACAO E PERFORMANCE -->
+                <TextBlock Text="Performance e Otimização" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,10,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="⚡" 
                     Content="Modo de Desempenho e Tweaks"
                     ToolTip="Gerenciar otimizações de registro, prioridade de CPU e serviços"
                     Click="BtnGoToTweaks_Click"/>
 
-                <Button Style="{StaticResource SettingsCardStyle}" Tag="🧹" 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="💿" 
                     Content="Armazenamento e Limpeza"
                     ToolTip="Limpar arquivos temporários, shaders e bloatware"
                     Click="BtnGoToCleanup_Click"/>
 
-                <Button Style="{StaticResource SettingsCardStyle}" Tag="📡" 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="📱" 
+                    Content="Bloatware e Aplicativos"
+                    ToolTip="Remover aplicativos desnecessários do Windows"
+                    Click="BtnGoToBloatware_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🚀" 
+                    Content="GameBoost Pro"
+                    ToolTip="Otimização inteligente de processos em tempo real"
+                    Click="BtnGoToGameBoost_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🎮" 
+                    Content="Games e Modo Jogo"
+                    ToolTip="Configurações de jogos e otimizações para games"
+                    Click="BtnGoToGames_Click"/>
+
+                <!-- REDE E INTERNET -->
+                <TextBlock Text="Rede e Conectividade" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🌐" 
                     Content="Otimizador de Rede (Ping)"
                     ToolTip="Ajustes de DNS, TCP/IP e Adaptador para menor latência"
                     Click="BtnGoToNetwork_Click"/>
 
-                <Button Style="{StaticResource SettingsCardStyle}" Tag="🛡️" 
-                    Content="Privacidade e Segurança"
-                    ToolTip="Verificar Defender, Desativar Telemetria e VBS"
-                    Click="BtnGoToPrivacy_Click"/>
+                <!-- PRIVACIDADE E SEGURANCA -->
+                <TextBlock Text="Privacidade e Segurança" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="🔒" 
-                    Content="O&amp;O ShutUp10"
-                    ToolTip="Controle completo de privacidade do Windows"
-                    Click="BtnGoToOOShutUp_Click"/>
+                    Content="Privacidade e Telemetria"
+                    ToolTip="Desativar Telemetria, Defender e controle de privacidade"
+                    Click="BtnGoToPrivacy_Click"/>
 
-                <Button Style="{StaticResource SettingsCardStyle}" Tag="🪄" 
-                    Content="Otimização Automática"
-                    ToolTip="Otimização Inteligente do Sistema"
-                    Click="BtnGoToOptimize_Click"/>
+                
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🔐" 
+                    Content="Segurança do Sistema"
+                    ToolTip="Verificar status de segurança e configurações de proteção"
+                    Click="BtnGoToSecurity_Click"/>
 
-                <Button Style="{StaticResource SettingsCardStyle}" Tag="🛠️" 
-                    Content="Ferramentas Avançadas"
-                    ToolTip="Ferramentas avançadas de sistema"
-                    Click="BtnGoToAdvanced_Click"/>
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🧰" 
+                    Content="Integridade do Sistema (Scan)"
+                    ToolTip="Verificar arquivos de sistema, DISM e reparos"
+                    Click="BtnGoToIntegrity_Click"/>
+
+                <!-- SISTEMA E REPAROS -->
+                <TextBlock Text="Sistema e Reparos" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🔨" 
+                    Content="Ferramentas Avançadas (Winhance + WinBoot)"
+                    ToolTip="Editor de ISO, Gerenciador de Partições e WinBoot (Instalação Windows sem USB)"
+                    Click="BtnGoToAdvancedTools_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="💻" 
+                    Content="WinBoot (Instalação Windows)"
+                    ToolTip="Instalação local do Windows sem USB - ISO, Partição e WinBoot"
+                    Click="BtnGoToWinBoot_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🔧" 
+                    Content="Reparos do Sistema"
+                    ToolTip="Ferramentas de reparo do Windows"
+                    Click="BtnGoToRepairs_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="💾" 
+                    Content="Drivers do Sistema"
+                    ToolTip="Gerenciamento e atualização de drivers"
+                    Click="BtnGoToDrivers_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="💽" 
+                    Content="Gerenciar Partições"
+                    ToolTip="Gerenciamento de disco e partições"
+                    Click="BtnGoToPartitions_Click"/>
+
+                <!-- ATIVACAO E CONFIGURACOES -->
+                <TextBlock Text="Ativação e Configurações" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="🔑" 
                     Content="Microsoft Activation Scripts"
                     ToolTip="Verificar status de ativação do Windows e Office"
                     Click="BtnGoToActivation_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🔔" 
+                    Content="Configurações do TrayIcon"
+                    ToolTip="Configurar ícone da bandeja, RAM e GameBoost"
+                    Click="BtnGoToTraySettings_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🔄" 
+                    Content="Atualizações do Kit Lugia"
+                    ToolTip="Verificar e instalar atualizações do aplicativo"
+                    Click="BtnGoToUpdate_Click"/>
+
+                <!-- EXTRAS -->
+                <TextBlock Text="Extras" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🖥️" 
+                    Content="Tela e Cores (Screen)"
+                    ToolTip="Configurações de tela, resolução e cores"
+                    Click="BtnGoToScreen_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="🛡️ShutUp" 
+                    Content="O&amp;O ShutUp10 (Privacidade Completa)"
+                    ToolTip="Controle completo de privacidade do Windows (não funcional)"
+                    Click="BtnGoToShutUp10_Click"/>
             </StackPanel>
         </ScrollViewer>
 
@@ -300,7 +374,7 @@ Title="Sistema">
                     
                     <CheckBox x:Name="ChkTrayIcon" Content="1. Ícone de bandeja (Monitor RAM e CPU)" Foreground="White" Margin="0,0,0,10"/>
                     <CheckBox x:Name="ChkStartWithWindows" Content="2. Iniciar com o Windows (Silencioso)" Foreground="White" Margin="0,0,0,10"/>
-                    <CheckBox x:Name="ChkGameBoost" Content="3. GameBoost (Prioridade Máxima para Jogos)" Foreground="White" Margin="0,0,0,25" Click="ChkGameBoost_Click"/>
+                    <CheckBox x:Name="ChkGameBoost" Content="3. GameBoost (Prioridade Máxima para Jogos + Motor V1)" Foreground="White" Margin="0,0,0,25"/>
 
                     <Grid>
                         <Grid.ColumnDefinitions>

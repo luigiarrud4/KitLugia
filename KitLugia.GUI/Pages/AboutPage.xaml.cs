@@ -14,6 +14,19 @@ namespace KitLugia.GUI.Pages
         public AboutPage()
         {
             InitializeComponent();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += AboutPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            this.Unloaded -= AboutPage_Unloaded;
+        }
+
+        private void AboutPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void BtnLegacy_Click(object sender, RoutedEventArgs e)

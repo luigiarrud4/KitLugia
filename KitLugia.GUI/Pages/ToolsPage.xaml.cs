@@ -43,6 +43,21 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             _initialTabIndex = tabIndex;
             Loaded += ToolsPage_Loaded;
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            Unloaded += ToolsPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            CmbPowerPlans.ItemsSource = null;
+            Loaded -= ToolsPage_Loaded;
+            Unloaded -= ToolsPage_Unloaded;
+        }
+
+        private void ToolsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void ToolsPage_Loaded(object sender, RoutedEventArgs e)

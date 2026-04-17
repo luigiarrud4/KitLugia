@@ -120,16 +120,31 @@
             </Border>
 
             <!-- COLUNA DIREITA (Cartões) -->
-            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="0,0,10,0">
-                <ItemsControl x:Name="ItemsRepairs">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
+            <ListBox Grid.Column="1" x:Name="ItemsRepairs"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     Background="Transparent" BorderThickness="0"
+                     Padding="0,0,10,0">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
 
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
                             <!-- LARGURA 460px -->
                             <Button Click="BtnRunRepair_Click" Tag="{Binding}"
                                     Width="460" MinHeight="100" Margin="0,0,15,15"
@@ -215,10 +230,9 @@
                                     </ControlTemplate>
                                 </Button.Template>
                             </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </Grid>
     </Grid>
 </Page>

@@ -18,15 +18,41 @@ namespace KitLugia.GUI.Pages
         private bool _isBusy = false;
         private bool _isUpgrade = false;
         private string? _customXmlPath = null;
+        private bool _isUsingCustomXml = false;
         private string? _injectedPath = null;
         private bool _isLinux = false;
+        private Action<string>? _logUpdateHandler;
 
         public WinbootPage()
         {
             InitializeComponent();
-            WinbootManager.OnLogUpdate += (msg) => Dispatcher.Invoke(() => AppendLog(msg));
+
+            // 🔥 LIMPEZA: Store handler reference so we can unsubscribe on Unloaded
+            _logUpdateHandler = (msg) => Dispatcher.Invoke(() => AppendLog(msg));
+            WinbootManager.OnLogUpdate += _logUpdateHandler;
+
+            // 🔥 LIMPEZA: Unsubscribe from event when page is unloaded
+            this.Unloaded += WinbootPage_Unloaded;
+
             RefreshDisks();
             LoadAutomationProfiles();
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // 🔥 LIMPEZA: Remove event handler to prevent memory leak
+            if (_logUpdateHandler != null)
+            {
+                WinbootManager.OnLogUpdate -= _logUpdateHandler;
+                _logUpdateHandler = null;
+            }
+            this.Unloaded -= WinbootPage_Unloaded;
+        }
+
+        private void WinbootPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void LoadAutomationProfiles()
@@ -47,6 +73,9 @@ namespace KitLugia.GUI.Pages
         {
             if (ComboAutomationProfiles.SelectedItem is WinbootManager.AutomationProfile profile)
             {
+                // Reset flag quando usuário muda perfil
+                _isUsingCustomXml = false;
+
                 if (profile.FileName == null)
                 {
                     // Gerador Interno: Mostra tudo
@@ -83,10 +112,40 @@ namespace KitLugia.GUI.Pages
             if (dlg.ShowDialog() == true)
             {
                 _customXmlPath = dlg.FileName;
+                _isUsingCustomXml = false; // IMPORTAR XML não é modo custom
+                
+                // Esconde gerador interno para IMPORTAR XML (diferente do CUSTOM)
+                PanelGeneratorCheckboxes.Visibility = Visibility.Collapsed;
+                PanelUserAccount.Visibility = Visibility.Collapsed;
+                
                 TxtCustomXmlInfo.Text = "IMPORTADO: " + Path.GetFileName(_customXmlPath);
                 TxtCustomXmlInfo.Foreground = (System.Windows.Media.SolidColorBrush)FindResource("AccentColor");
                 WinbootManager.Log($"XML Customizado importado: {_customXmlPath}");
+                WinbootManager.Log("⚠️ Arquivo será usado diretamente sem ajustes do KitLugia");
             }
+        }
+
+        private void BtnBrowseCustomAutounattend_Click(object sender, RoutedEventArgs e)
+        {
+            // Abre o overlay de criação/edição de autounattend.xml
+            if (!string.IsNullOrEmpty(_customXmlPath) && File.Exists(_customXmlPath))
+            {
+                TxtAutounattendXml.Text = File.ReadAllText(_customXmlPath);
+            }
+            else
+            {
+                // Gerar XML padrão usando Ookii.AnswerFile
+                var tempPath = Path.GetTempPath() + "temp_autounattend.xml";
+                WinbootManager.GenerateAutounattendXml(tempPath);
+                if (File.Exists(tempPath))
+                {
+                    TxtAutounattendXml.Text = File.ReadAllText(tempPath);
+                    File.Delete(tempPath);
+                }
+            }
+            
+            OverlayAutounattend.Visibility = Visibility.Visible;
+            WinbootManager.Log("Overlay de criação de autounattend.xml aberto para modo custom");
         }
 
 
@@ -152,6 +211,260 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private void BtnGenerateAutounattend_Click(object sender, RoutedEventArgs e)
+        {
+            // Abrir o overlay de geração do autounattend.xml
+            OverlayAutounattend.Visibility = Visibility.Visible;
+        }
+
+        private void BtnGenerateAutounattendConfig_Click(object sender, RoutedEventArgs e)
+        {
+            // Abrir o overlay de geração do autounattend.xml (do overlay de configuração)
+            OverlayAutounattend.Visibility = Visibility.Visible;
+        }
+
+        private void BtnEditAutounattend_Click(object sender, RoutedEventArgs e)
+        {
+            // Abrir o editor de autounattend.xml
+            if (!string.IsNullOrEmpty(_customXmlPath) && File.Exists(_customXmlPath))
+            {
+                TxtAutounattendXml.Text = File.ReadAllText(_customXmlPath);
+            }
+            else
+            {
+                // Gerar XML padrão usando Ookii.AnswerFile
+                var tempPath = Path.GetTempPath() + "temp_autounattend.xml";
+                WinbootManager.GenerateAutounattendXml(tempPath);
+                if (File.Exists(tempPath))
+                {
+                    TxtAutounattendXml.Text = File.ReadAllText(tempPath);
+                    File.Delete(tempPath);
+                }
+            }
+            OverlayAutounattendEditor.Visibility = Visibility.Visible;
+        }
+
+        private void BtnCancelEditor_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayAutounattendEditor.Visibility = Visibility.Collapsed;
+            TxtAutounattendXml.Clear();
+        }
+
+        private void BtnSaveEditor_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "Arquivos XML (*.xml)|*.xml",
+                FileName = "autounattend.xml",
+                Title = "Salvar arquivo autounattend.xml"
+            };
+
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    File.WriteAllText(dlg.FileName, TxtAutounattendXml.Text);
+                    _customXmlPath = dlg.FileName;
+                    TxtCustomXmlInfo.Text = "IMPORTADO: " + Path.GetFileName(_customXmlPath);
+                    TxtCustomXmlInfo.Foreground = (System.Windows.Media.SolidColorBrush)FindResource("AccentColor");
+                    OverlayAutounattendEditor.Visibility = Visibility.Collapsed;
+                    System.Windows.MessageBox.Show($"Arquivo autounattend.xml salvo com sucesso!\n\nLocal: {dlg.FileName}",
+                        "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show($"Erro ao salvar arquivo: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void BtnCancelAutounattend_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayAutounattend.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnContinueCustom_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Obtém configurações do overlay de autounattend
+                bool bypass = ChkAuBypassTpm.IsChecked == true;
+                bool local = ChkAuLocalAccount.IsChecked == true;
+                bool privacy = ChkAuDisablePrivacy.IsChecked == true;
+                bool fullAuto = ChkAuFullAuto.IsChecked == true;
+                bool disableDefender = ChkAuDisableDefender.IsChecked == true;
+                bool autoLogon = ChkAuAutoLogon.IsChecked == true;
+                bool remoteDesktop = ChkAuRemoteDesktop.IsChecked == true;
+                bool showAllEditions = ChkAuShowAllEditions.IsChecked == true;
+                bool disableBitlocker = ChkAuDisableBitlocker.IsChecked == true;
+                bool disableHibernate = ChkAuDisableHibernate.IsChecked == true;
+                bool disableCopilot = ChkAuDisableCopilot.IsChecked == true;
+                bool removeEdge = ChkAuRemoveEdge.IsChecked == true;
+                bool removeCortana = ChkAuRemoveCortana.IsChecked == true;
+                bool removeOneDrive = ChkAuRemoveOneDrive.IsChecked == true;
+                bool disableSpotlight = ChkAuDisableSpotlight.IsChecked == true;
+                bool disableNews = ChkAuDisableNews.IsChecked == true;
+                bool disableChat = ChkAuDisableChat.IsChecked == true;
+                bool disableAutoUpdate = ChkAuDisableAutoUpdate.IsChecked == true;
+                bool disableDeliveryOpt = ChkAuDisableDeliveryOpt.IsChecked == true;
+                bool delayUpdates = ChkAuDelayUpdates.IsChecked == true;
+                bool longPaths = ChkAuLongPaths.IsChecked == true;
+                bool disableLocation = ChkAuDisableLocation.IsChecked == true;
+                bool disableActivity = ChkAuDisableActivity.IsChecked == true;
+                bool disableAdID = ChkAuDisableAdID.IsChecked == true;
+                bool disableErrorReporting = ChkAuDisableErrorReporting.IsChecked == true;
+                bool disableInkWorkspace = ChkAuDisableInkWorkspace.IsChecked == true;
+                bool disableSmartScreen = ChkAuDisableSmartScreen.IsChecked == true;
+                bool disableDefenderSandbox = ChkAuDisableDefenderSandbox.IsChecked == true;
+                bool disableUAC = ChkAuDisableUAC.IsChecked == true;
+                bool hideEula = ChkAuHideEula.IsChecked == true;
+                bool hideOEM = ChkAuHideOEM.IsChecked == true;
+                bool hideWireless = ChkAuHideWireless.IsChecked == true;
+                bool hideOnlineAccount = ChkAuHideOnlineAccount.IsChecked == true;
+                bool protectYourPC = ChkAuProtectYourPC.IsChecked == true;
+                string user = TxtAuUserName.Text ?? "Usuario";
+                string pass = TxtAuPassword.Password;
+                string computerName = TxtAuComputerName.Text ?? "";
+
+                // Obtém idioma e fuso horário
+                string language = "pt-BR";
+                string timeZone = "E. South America Standard Time";
+
+                if (CmbAuLanguage.SelectedItem is ComboBoxItem langItem && langItem.Tag != null)
+                {
+                    language = langItem.Tag.ToString() ?? "pt-BR";
+                }
+
+                if (CmbAuTimeZone.SelectedItem is ComboBoxItem tzItem && tzItem.Tag != null)
+                {
+                    timeZone = tzItem.Tag.ToString() ?? "E. South America Standard Time";
+                }
+
+                // Obtém comandos pós-instalação
+                var commands = TxtAuCommands.Text?.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+
+                // Salva em arquivo temporário
+                string tempPath = Path.Combine(Path.GetTempPath(), $"kitlugia_custom_autounattend_{Guid.NewGuid()}.xml");
+                
+                // Gera o arquivo usando WinbootManager
+                WinbootManager.GenerateAutounattendXml(tempPath, bypass, local, privacy, user, pass, fullAuto, disableDefender, autoLogon, remoteDesktop, language, timeZone, commands,
+                    showAllEditions, disableBitlocker, disableHibernate, disableCopilot, removeEdge, removeCortana, removeOneDrive, disableSpotlight, disableNews, disableChat,
+                    disableAutoUpdate, disableDeliveryOpt, delayUpdates, longPaths, disableLocation, disableActivity, disableAdID, disableErrorReporting, disableInkWorkspace,
+                    disableSmartScreen, disableDefenderSandbox, disableUAC, hideEula, hideOEM, hideWireless, hideOnlineAccount, protectYourPC, computerName);
+
+                // Define como arquivo customizado
+                _customXmlPath = tempPath;
+                _isUsingCustomXml = true;
+
+                // Fecha overlay de autounattend
+                OverlayAutounattend.Visibility = Visibility.Collapsed;
+
+                // Mostra gerador interno para ajustes adicionais
+                PanelGeneratorCheckboxes.Visibility = Visibility.Visible;
+                PanelUserAccount.Visibility = Visibility.Visible;
+
+                // Atualiza UI
+                TxtCustomXmlInfo.Text = "📁 CUSTOM: autounattend.xml (Gerado)";
+                TxtCustomXmlInfo.Foreground = (System.Windows.Media.SolidColorBrush)FindResource("AccentColor");
+                TxtConfigTitle.Text = "⚙️ CONFIGURAR INSTALAÇÃO (CUSTOM)";
+                TxtConfigIsoInfo.Text = "Usando arquivo autounattend.xml customizado como base";
+
+                WinbootManager.Log("Arquivo autounattend.xml customizado gerado a partir do gerador");
+                WinbootManager.Log("⚠️ O arquivo será usado como base. Você pode ajustar configurações adicionais abaixo.");
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Erro ao gerar arquivo customizado: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnConfirmAutounattend_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "Arquivos XML (*.xml)|*.xml",
+                FileName = "autounattend.xml",
+                Title = "Salvar arquivo autounattend.xml"
+            };
+
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    // Obtém configurações do overlay de autounattend
+                    bool bypass = ChkAuBypassTpm.IsChecked ?? true;
+                    bool local = ChkAuLocalAccount.IsChecked ?? true;
+                    bool privacy = ChkAuDisablePrivacy.IsChecked ?? true;
+                    bool fullAuto = ChkAuFullAuto.IsChecked ?? true;
+                    bool disableDefender = ChkAuDisableDefender.IsChecked ?? false;
+                    bool autoLogon = ChkAuAutoLogon.IsChecked ?? true;
+                    bool remoteDesktop = ChkAuRemoteDesktop.IsChecked ?? false;
+                    bool showAllEditions = ChkAuShowAllEditions.IsChecked ?? false;
+                    bool disableBitlocker = ChkAuDisableBitlocker.IsChecked ?? true;
+                    bool disableHibernate = ChkAuDisableHibernate.IsChecked ?? false;
+                    bool disableCopilot = ChkAuDisableCopilot.IsChecked ?? true;
+                    bool removeEdge = ChkAuRemoveEdge.IsChecked ?? false;
+                    bool removeCortana = ChkAuRemoveCortana.IsChecked ?? true;
+                    bool removeOneDrive = ChkAuRemoveOneDrive.IsChecked ?? false;
+                    bool disableSpotlight = ChkAuDisableSpotlight.IsChecked ?? true;
+                    bool disableNews = ChkAuDisableNews.IsChecked ?? true;
+                    bool disableChat = ChkAuDisableChat.IsChecked ?? true;
+                    bool disableAutoUpdate = ChkAuDisableAutoUpdate.IsChecked ?? false;
+                    bool disableDeliveryOpt = ChkAuDisableDeliveryOpt.IsChecked ?? true;
+                    bool delayUpdates = ChkAuDelayUpdates.IsChecked ?? false;
+                    bool longPaths = ChkAuLongPaths.IsChecked ?? true;
+                    bool disableLocation = ChkAuDisableLocation.IsChecked ?? true;
+                    bool disableActivity = ChkAuDisableActivity.IsChecked ?? true;
+                    bool disableAdID = ChkAuDisableAdID.IsChecked ?? true;
+                    bool disableErrorReporting = ChkAuDisableErrorReporting.IsChecked ?? true;
+                    bool disableInkWorkspace = ChkAuDisableInkWorkspace.IsChecked ?? false;
+                    bool disableSmartScreen = ChkAuDisableSmartScreen.IsChecked ?? false;
+                    bool disableDefenderSandbox = ChkAuDisableDefenderSandbox.IsChecked ?? false;
+                    bool disableUAC = ChkAuDisableUAC.IsChecked ?? false;
+                    bool hideEula = ChkAuHideEula.IsChecked ?? true;
+                    bool hideOEM = ChkAuHideOEM.IsChecked ?? true;
+                    bool hideWireless = ChkAuHideWireless.IsChecked ?? true;
+                    bool hideOnlineAccount = ChkAuHideOnlineAccount.IsChecked ?? true;
+                    bool protectYourPC = ChkAuProtectYourPC.IsChecked ?? true;
+                    string user = TxtAuUserName.Text ?? "Usuario";
+                    string pass = TxtAuPassword.Password;
+                    string computerName = TxtAuComputerName.Text ?? "";
+
+                    // Obtém idioma e fuso horário
+                    string language = "pt-BR";
+                    string timeZone = "E. South America Standard Time";
+
+                    if (CmbAuLanguage.SelectedItem is ComboBoxItem langItem && langItem.Tag != null)
+                    {
+                        language = langItem.Tag.ToString() ?? "pt-BR";
+                    }
+
+                    if (CmbAuTimeZone.SelectedItem is ComboBoxItem tzItem && tzItem.Tag != null)
+                    {
+                        timeZone = tzItem.Tag.ToString() ?? "E. South America Standard Time";
+                    }
+
+                    // Obtém comandos pós-instalação
+                    var commands = TxtAuCommands.Text?.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+
+                    // Gera o arquivo usando WinbootManager
+                    WinbootManager.GenerateAutounattendXml(dlg.FileName, bypass, local, privacy, user, pass, fullAuto, disableDefender, autoLogon, remoteDesktop, language, timeZone, commands,
+                        showAllEditions, disableBitlocker, disableHibernate, disableCopilot, removeEdge, removeCortana, removeOneDrive, disableSpotlight, disableNews, disableChat,
+                        disableAutoUpdate, disableDeliveryOpt, delayUpdates, longPaths, disableLocation, disableActivity, disableAdID, disableErrorReporting, disableInkWorkspace,
+                        disableSmartScreen, disableDefenderSandbox, disableUAC, hideEula, hideOEM, hideWireless, hideOnlineAccount, protectYourPC, computerName);
+
+                    OverlayAutounattend.Visibility = Visibility.Collapsed;
+
+                    System.Windows.MessageBox.Show($"Arquivo autounattend.xml gerado com sucesso!\n\nLocal: {dlg.FileName}",
+                        "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show($"Erro ao gerar arquivo: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
         private void TxtIsoPath_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrEmpty(TxtIsoPath.Text)) return;
@@ -178,6 +491,9 @@ namespace KitLugia.GUI.Pages
         private void BtnCancelConfig_Click(object sender, RoutedEventArgs e)
         {
             OverlayConfig.Visibility = Visibility.Collapsed;
+            _isUsingCustomXml = false;
+            TxtConfigTitle.Text = "⚙️ CONFIGURAR INSTALAÇÃO";
+            TxtConfigIsoInfo.Text = "Identificando ISO...";
         }
 
         private async void BtnCreate_Click(object sender, RoutedEventArgs e)
@@ -337,6 +653,13 @@ namespace KitLugia.GUI.Pages
 
             OverlayConfig.Visibility = Visibility.Collapsed;
 
+            // Log informativo se estiver usando arquivo customizado
+            if (_isUsingCustomXml && !string.IsNullOrEmpty(_customXmlPath))
+            {
+                WinbootManager.Log($"📁 Usando arquivo autounattend.xml customizado: {Path.GetFileName(_customXmlPath)}");
+                WinbootManager.Log("⚠️ As configurações adicionais selecionadas serão aplicadas junto com o arquivo customizado.");
+            }
+
             if (_isLinux)
             {
                 var result = System.Windows.MessageBox.Show(
@@ -352,7 +675,7 @@ namespace KitLugia.GUI.Pages
 
                 if (result != MessageBoxResult.Yes) return;
             }
-            
+
             var selectedPart = ComboPartitions.SelectedItem as PartitionInfo;
             if (selectedPart == null) return;
 
@@ -363,6 +686,7 @@ namespace KitLugia.GUI.Pages
             bool inject = ChkInjectKit.IsChecked ?? false;
             bool cleanup = ChkAutoCleanup.IsChecked ?? false;
             bool auto = ChkFullAuto.IsChecked ?? false;
+            bool safeMode = ChkSafeMode.IsChecked ?? false;
             bool isMultiIso = ChkMultiIso.IsChecked ?? false;
             string user = TxtUserName.Text;
             string pass = TxtPassword.Password;
@@ -421,7 +745,9 @@ namespace KitLugia.GUI.Pages
                         auto,
                         (uint)selectedPart.DiskIndex,
                         (uint)selectedPart.Index,
-                        _injectedPath);
+                        _injectedPath,
+                        safeMode,
+                        downloadConfirmationCallback: (message) => Task.FromResult(ChkDownloadDotnet.IsChecked ?? true));
 
                     if (!customOk) WinbootManager.Log("Aviso: Falha ao aplicar algumas automações, mas o processo continuará.");
                 }
@@ -526,7 +852,7 @@ namespace KitLugia.GUI.Pages
 
 
 
-        private void BtnRemove_Click(object sender, RoutedEventArgs e)
+        private async void BtnRemove_Click(object sender, RoutedEventArgs e)
         {
              var candidates = WinbootManager.GetRemovablePartitions();
 
@@ -534,7 +860,7 @@ namespace KitLugia.GUI.Pages
              {
                  if (ConfirmAction("Nenhuma partição Winboot detectada no disco.\n\nDeseja realizar uma varredura para limpar entradas de boot antigas (Múltiplos Boots na Tela Azul) criadas pelo KitLugia?"))
                  {
-                     ExecuteBcdCleanup();
+                     await ExecuteBcdCleanupWithUI();
                  }
                  return;
              }
@@ -549,16 +875,64 @@ namespace KitLugia.GUI.Pages
                  return;
              }
 
-             // Múltiplos candidatos -> Abrir Overlay
-             WinbootManager.Log($"Encontrados {candidates.Count} candidatos para remoção. Abrindo seletor...");
+             // Múltiplos candidatos -> Mostrar card inline
+             WinbootManager.Log($"Encontrados {candidates.Count} candidatos para remoção. Mostrando seletor...");
              ComboRemovalCandidates.ItemsSource = candidates.Select(p => new { Value = p, DisplayName = $"[{p.DriveLetter}] {p.Label} ({p.Size / 1024 / 1024 / 1024} GB) - Disk {p.DiskIndex}" }).ToList();
              ComboRemovalCandidates.SelectedIndex = 0;
-             OverlayRemoval.Visibility = Visibility.Visible;
+             CardRemovalSelection.Visibility = Visibility.Visible;
+        }
+
+        private async Task ExecuteBcdCleanupWithUI()
+        {
+            WinbootManager.Log("Iniciando limpeza de entradas BCD...");
+
+            // Escaneia as entradas BCD
+            var entries = await WinbootManager.ScanWinbootForCleanup();
+
+            if (entries.Count == 0)
+            {
+                System.Windows.MessageBox.Show("Nenhuma entrada BCD do KitLugia encontrada.", "Limpeza BCD", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Converte para o formato da UI
+            var uiEntries = entries.Select(e => new Windows.BcdEntryInfo
+            {
+                Guid = e.Guid,
+                Description = e.Description,
+                Reason = e.Reason,
+                Type = e.Type,
+                IsCritical = e.IsCritical
+            }).ToList();
+
+            // Mostra a janela de seleção
+            var cleanerWindow = new Windows.BcdCleanerWindow(uiEntries);
+            cleanerWindow.Owner = Window.GetWindow(this);
+
+            if (cleanerWindow.ShowDialog() == true)
+            {
+                // Usuário confirmou remoção
+                if (cleanerWindow.SelectedGuids.Count > 0)
+                {
+                    WinbootManager.Log($"Removendo {cleanerWindow.SelectedGuids.Count} entradas BCD selecionadas...");
+                    await WinbootManager.RemoveWinboot(customGuids: cleanerWindow.SelectedGuids);
+                    System.Windows.MessageBox.Show($"Limpeza concluída! {cleanerWindow.SelectedGuids.Count} entradas removidas.", "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    WinbootManager.Log("Nenhuma entrada selecionada para remoção.");
+                }
+            }
+            else
+            {
+                WinbootManager.Log("Limpeza BCD cancelada pelo usuário.");
+            }
         }
 
         private void BtnCancelRemoval_Click(object sender, RoutedEventArgs e)
         {
-            OverlayRemoval.Visibility = Visibility.Collapsed;
+            CardRemovalSelection.Visibility = Visibility.Collapsed;
+            WinbootManager.Log("Seleção de remoção cancelada pelo usuário.");
         }
 
         private void BtnConfirmRemoval_Click(object sender, RoutedEventArgs e)
@@ -569,8 +943,12 @@ namespace KitLugia.GUI.Pages
             dynamic selectedItem = ComboRemovalCandidates.SelectedItem;
             PartitionInfo target = selectedItem.Value;
 
-            OverlayRemoval.Visibility = Visibility.Collapsed;
-            ExecuteRemoval(target);
+            CardRemovalSelection.Visibility = Visibility.Collapsed;
+            
+            if (ConfirmAction($"Deseja DELETAR a partição {target.DriveLetter} ({target.Label} - {target.Size / 1024 / 1024 / 1024} GB) e as entradas de boot da Tela Azul?"))
+            {
+                ExecuteRemoval(target);
+            }
         }
 
         private async Task ExecuteRemoval(PartitionInfo target)

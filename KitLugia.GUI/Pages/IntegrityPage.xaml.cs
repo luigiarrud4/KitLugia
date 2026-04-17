@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,11 +22,35 @@ namespace KitLugia.GUI.Pages
     public partial class IntegrityPage : Page
     {
         private bool _isBusy = false;
+        private CancellationTokenSource? _scanCts; // 🔥 LIMPEZA: Token para cancelar scan
 
         public IntegrityPage()
         {
             InitializeComponent();
+
+            // Inicializa com estado desabilitado
+            UpdateUiState(false);
+
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += IntegrityPage_Unloaded;
+
             RunScan();
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // 🔥 LIMPEZA: Cancelar scan pendente e liberar recursos
+            _scanCts?.Cancel();
+            _scanCts?.Dispose();
+            _scanCts = null;
+            _isBusy = false;
+            this.Unloaded -= IntegrityPage_Unloaded;
+        }
+
+        private void IntegrityPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private async Task RunScan()

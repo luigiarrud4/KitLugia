@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using KitLugia.Core;
+using KitLugia.GUI.Extensions;
 // Resolve ambiguidade
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
@@ -15,6 +16,21 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             _ = LoadSystemInfo();
+
+            // 🔥 LIMPEZA: Cancela operações pendentes ao sair da página
+            this.Unloaded += DashboardPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // 🔥 CORREÇÃO: Desinscreve do evento Unloaded para evitar memory leak do WPF
+            this.Unloaded -= DashboardPage_Unloaded;
+        }
+
+        private void DashboardPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
        
         private async Task LoadSystemInfo()
@@ -47,14 +63,35 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        // === PERFORMANCE E OTIMIZACAO ===
         private void BtnGoToTweaks_Click(object sender, RoutedEventArgs e) => RequestNavigation("⚡");
         private void BtnGoToCleanup_Click(object sender, RoutedEventArgs e) => RequestNavigation("💿");
+        private void BtnGoToBloatware_Click(object sender, RoutedEventArgs e) => RequestNavigation("📱");
+        private void BtnGoToGameBoost_Click(object sender, RoutedEventArgs e) => RequestNavigation("🚀");
+        private void BtnGoToGames_Click(object sender, RoutedEventArgs e) => RequestNavigation("🎮");
+        private void BtnGoToTools_Click(object sender, RoutedEventArgs e) => RequestNavigation("🛠️");
+
+        // === REDE E INTERNET ===
         private void BtnGoToNetwork_Click(object sender, RoutedEventArgs e) => RequestNavigation("🌐");
-        private void BtnGoToPrivacy_Click(object sender, RoutedEventArgs e) => RequestNavigation("🛡️");
-        private void BtnGoToOOShutUp_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔒");
-        private void BtnGoToOptimize_Click(object sender, RoutedEventArgs e) => RequestNavigation("⚙️");
-        private void BtnGoToAdvanced_Click(object sender, RoutedEventArgs e) => RequestNavigation("🚀");
+
+        // === PRIVACIDADE E SEGURANCA ===
+        private void BtnGoToPrivacy_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔒");
+        private void BtnGoToShutUp10_Click(object sender, RoutedEventArgs e) => RequestNavigation("🛡️ShutUp");
+        private void BtnGoToSecurity_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔐");
+        private void BtnGoToIntegrity_Click(object sender, RoutedEventArgs e) => RequestNavigation("🧰");
+
+        // === SISTEMA E REPAROS ===
+        private void BtnGoToAdvancedTools_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔨");
+        private void BtnGoToWinBoot_Click(object sender, RoutedEventArgs e) => RequestNavigation("💻");
+        private void BtnGoToRepairs_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔧");
+        private void BtnGoToDrivers_Click(object sender, RoutedEventArgs e) => RequestNavigation("💾");
+        private void BtnGoToPartitions_Click(object sender, RoutedEventArgs e) => RequestNavigation("💽");
+        private void BtnGoToScreen_Click(object sender, RoutedEventArgs e) => RequestNavigation("🖥️");
+
+        // === ATIVACAO E CONFIGURACOES ===
         private void BtnGoToActivation_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔑");
+        private void BtnGoToTraySettings_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔔");
+        private void BtnGoToUpdate_Click(object sender, RoutedEventArgs e) => RequestNavigation("🔄");
 
         // --- AÇÕES DOS BOTÕES GRANDES (1-CLICK) ---
 
@@ -88,11 +125,6 @@ namespace KitLugia.GUI.Pages
             catch { }
         }
 
-        private void ChkGameBoost_Click(object sender, RoutedEventArgs e)
-        {
-            // Removido auto-start forçado para evitar impacto na performance
-            // GameBoost agora funciona independente de auto-start
-        }
 
         private void UpdateVramRecommendations()
         {
@@ -145,11 +177,10 @@ namespace KitLugia.GUI.Pages
             try
             {
                 CmbGpu.Items.Clear();
-                var gpus = SystemTweaks.GetAllGpus();
+                var gpuNames = SystemTweaks.GetAllGpuNames(); // 🔥 Usa novo método sem memory leak
                 
-                foreach (var gpu in gpus)
+                foreach (var name in gpuNames)
                 {
-                    string name = gpu["Name"]?.ToString() ?? "GPU Desconhecida";
                     CmbGpu.Items.Add(name);
                 }
 
@@ -179,12 +210,16 @@ namespace KitLugia.GUI.Pages
 
             ApplyTraySettingsFromQuickMenu();
 
-            // Detectar RegPath da GPU selecionada
+            // 🔥 NOVO: Configura GameBoost para V1 (ORIGINAL) - Modo seguro de otimização
+            Services.TrayIconService.SetEngine(1);
+            KitLugia.Core.Logger.Log("🎮 Dashboard: GameBoost configurado para V1 (ORIGINAL) via Otimização Inteligente");
+
+            // Detectar RegPath da GPU selecionada - Usa método seguro sem ManagementObject
             int index = CmbGpu.SelectedIndex;
-            var allGpus = SystemTweaks.GetAllGpus();
-            if (index >= 0 && index < allGpus.Count)
+            var gpuNames = SystemTweaks.GetAllGpuNames();
+            if (index >= 0 && index < gpuNames.Count)
             {
-                settings.TargetGpuRegPath = SystemTweaks.FindGpuRegistryPath(allGpus[index]);
+                settings.TargetGpuRegPath = SystemTweaks.FindGpuRegistryPathByDescription(gpuNames[index]);
             }
 
             // Mapear VRAM
@@ -239,6 +274,9 @@ namespace KitLugia.GUI.Pages
                     mw.TrayService.SaveSettings();
 
                     KitLugia.GUI.Services.TrayIconService.SetAutoStart(ChkStartWithWindows.IsChecked == true);
+                    
+                    // 🔥 GameBoost é apenas ON/OFF - NÃO altera o motor selecionado!
+                    KitLugia.Core.Logger.Log($"🎮 Dashboard: GameBoost {(ChkGameBoost.IsChecked == true ? "ativado" : "desativado")}");
                 }
             }
             catch { }

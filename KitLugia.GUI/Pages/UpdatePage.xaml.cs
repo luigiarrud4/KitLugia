@@ -25,14 +25,30 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             Loaded += UpdatePage_Loaded;
-            
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            Unloaded += UpdatePage_Unloaded;
+
             // ✅ Carregar informações após inicialização completa
             Dispatcher.BeginInvoke(async () => await LoadCurrentVersionInfoAsync());
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // Limpar panel de info e desregistrar eventos
+            CurrentInfoPanel?.Children?.Clear();
+            Loaded -= UpdatePage_Loaded;
+            Unloaded -= UpdatePage_Unloaded;
         }
 
         private void UpdatePage_Loaded(object sender, RoutedEventArgs e)
         {
             // Event handler vazio - apenas para garantir que Loaded seja disparado
+        }
+
+        private void UpdatePage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private async Task LoadCurrentVersionInfoAsync()
@@ -532,7 +548,7 @@ namespace KitLugia.GUI.Pages
             try
             {
                 var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                var currentDir = Path.GetDirectoryName(currentExePath);
+                var currentDir = Path.GetDirectoryName(currentExePath) ?? string.Empty;
                 
                 // Corrigir: se currentExePath for .dll, mudar para .exe
                 if (currentExePath.EndsWith(".dll"))
@@ -588,10 +604,10 @@ namespace KitLugia.GUI.Pages
 
                     // 5. Copiar novo executável
                     File.Copy(newExePath, currentExePath, true);
-                    KitLugia.Core.Logger.Log("✅ Novo executável copiado");
+                    KitLugia.Core.Logger.Log(" Novo executável copiado");
 
-                    // 6. Copiar DLLs e dependências
-                    var sourceDir = Path.GetDirectoryName(newExePath);
+                    // Copiar DLLs e dependências
+                    var sourceDir = Path.GetDirectoryName(newExePath) ?? string.Empty;
                     foreach (var dll in Directory.GetFiles(sourceDir, "*.dll"))
                     {
                         var dllName = Path.GetFileName(dll);
@@ -672,7 +688,7 @@ echo Copiando DLLs...
 ";
                         
                         // Copiar DLLs
-                        var dllSourceDir = Path.GetDirectoryName(newExePath);
+                        var dllSourceDir = Path.GetDirectoryName(newExePath) ?? string.Empty;
                         foreach (var dll in Directory.GetFiles(dllSourceDir, "*.dll"))
                         {
                             var dllName = Path.GetFileName(dll);
@@ -702,7 +718,7 @@ del ""%~f0"" >nul 2>&1
                     }
                     
                     // Copiar DLLs e dependências
-                    var sourceDir = Path.GetDirectoryName(newExePath);
+                    var sourceDir = Path.GetDirectoryName(newExePath) ?? string.Empty;
                     foreach (var dll in Directory.GetFiles(sourceDir, "*.dll"))
                     {
                         var dllName = Path.GetFileName(dll);
@@ -798,7 +814,7 @@ del ""%~f0"" >nul 2>&1
 
                 await Task.Run(() =>
                 {
-                    var sourceDir = Path.GetDirectoryName(newExePath);
+                    var sourceDir = Path.GetDirectoryName(newExePath) ?? string.Empty;
 
                     // Copiar executável principal
                     var newExeName = Path.GetFileName(newExePath);
@@ -927,6 +943,9 @@ TIMESTAMP={DateTime.Now:yyyyMMddHHmmss}
             try
             {
                 // Criar um arquivo .cmd válido
+                var manifestDir = Path.GetDirectoryName(manifestFile) ?? string.Empty;
+                var currentDir = Path.GetDirectoryName(currentExePath) ?? string.Empty;
+                
                 var cmdContent = $@"@echo off
 title KitLugia Updater
 echo Aguardando KitLugia fechar...
@@ -934,10 +953,10 @@ timeout /t 3 /nobreak >nul
 taskkill /f /im KitLugia.GUI.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 echo Atualizando arquivos...
-robocopy ""{Path.Combine(Path.GetDirectoryName(manifestFile), "update")}"" ""{Path.GetDirectoryName(currentExePath)}"" /E /Y >nul 2>&1
+robocopy ""{Path.Combine(manifestDir, "update")}"" ""{currentDir}"" /E /Y >nul 2>&1
 echo Limpando arquivos temporarios...
-rd /s /q ""{Path.Combine(Path.GetDirectoryName(manifestFile), "update")}"" >nul 2>&1
-rd /s /q ""{Path.Combine(Path.GetDirectoryName(manifestFile), "backup")}"" >nul 2>&1
+rd /s /q ""{Path.Combine(manifestDir, "update")}"" >nul 2>&1
+rd /s /q ""{Path.Combine(manifestDir, "backup")}"" >nul 2>&1
 del ""{manifestFile}"" >nul 2>&1
 echo Iniciando nova versao...
 start """" ""{currentExePath}"" --tray
@@ -956,6 +975,9 @@ del ""%~f0"" >nul 2>&1";
         private byte[] CreateMinimalPEExecutable(string manifestFile, string currentExePath)
         {
             // Método não usado mais - mantido para compatibilidade
+            var manifestDir = Path.GetDirectoryName(manifestFile) ?? string.Empty;
+            var currentDir = Path.GetDirectoryName(currentExePath) ?? string.Empty;
+            
             var cmdContent = $@"@echo off
 title KitLugia Updater
 echo Aguardando KitLugia fechar...
@@ -963,10 +985,10 @@ timeout /t 3 /nobreak >nul
 taskkill /f /im KitLugia.GUI.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 echo Atualizando arquivos...
-robocopy ""{Path.Combine(Path.GetDirectoryName(manifestFile), "update")}"" ""{Path.GetDirectoryName(currentExePath)}"" /E /Y >nul 2>&1
+robocopy ""{Path.Combine(manifestDir, "update")}"" ""{currentDir}"" /E /Y >nul 2>&1
 echo Limpando arquivos temporarios...
-rd /s /q ""{Path.Combine(Path.GetDirectoryName(manifestFile), "update")}"" >nul 2>&1
-rd /s /q ""{Path.Combine(Path.GetDirectoryName(manifestFile), "backup")}"" >nul 2>&1
+rd /s /q ""{Path.Combine(manifestDir, "update")}"" >nul 2>&1
+rd /s /q ""{Path.Combine(manifestDir, "backup")}"" >nul 2>&1
 del ""{manifestFile}"" >nul 2>&1
 echo Iniciando nova versao...
 start """" ""{currentExePath}"" --tray

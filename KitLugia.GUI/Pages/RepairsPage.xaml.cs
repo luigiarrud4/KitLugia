@@ -16,11 +16,51 @@ namespace KitLugia.GUI.Pages
     {
         // Cache da lista completa para filtros rápidos
         private List<RepairAction> _allRepairs = new();
+        private CancellationTokenSource? _cts;
 
         public RepairsPage()
         {
             InitializeComponent();
+            _cts = new CancellationTokenSource();
             LoadData();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += RepairsPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // 🔥 Cancela todas as tasks em background
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
+
+            // 🔥 Limpa todas as listas e bindings
+            _allRepairs?.Clear();
+            _allRepairs = null!;
+
+            if (ItemsRepairs != null)
+            {
+                ItemsRepairs.ItemsSource = null;
+                ItemsRepairs.Items.Clear();
+            }
+
+            if (LstCategories != null)
+            {
+                LstCategories.ItemsSource = null;
+                LstCategories.Items.Clear();
+            }
+
+            // 🔥 Limpa TextBox
+            if (TxtFilter != null)
+                TxtFilter.Text = string.Empty;
+
+            this.Unloaded -= RepairsPage_Unloaded;
+        }
+
+        private void RepairsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void LoadData()
@@ -110,6 +150,8 @@ namespace KitLugia.GUI.Pages
                     // Isso impede que a janela congele enquanto roda o comando
                     await Task.Run(() =>
                     {
+                        if (_cts?.IsCancellationRequested == true) return;
+
                         // Roda o código Action definido no Core
                         action.Execute?.Invoke();
                     });

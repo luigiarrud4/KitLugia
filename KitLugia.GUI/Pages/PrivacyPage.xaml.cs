@@ -21,7 +21,7 @@ namespace KitLugia.GUI.Pages
     public partial class PrivacyPage : Page
     {
         public ObservableCollection<PrivacyCategoryViewModel> Categories { get; set; } = new ObservableCollection<PrivacyCategoryViewModel>();
-        private DispatcherTimer _refreshTimer;
+        private DispatcherTimer? _refreshTimer;
 
         public PrivacyPage()
         {
@@ -29,6 +29,22 @@ namespace KitLugia.GUI.Pages
             DataContext = this;
             LoadData();
             InitializeTimer();
+
+            // 🔥 LIMPEZA: Para timer ao sair da página
+            this.Unloaded += PrivacyPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            _refreshTimer?.Stop();
+            _refreshTimer = null;
+            this.Unloaded -= PrivacyPage_Unloaded;
+        }
+
+        private void PrivacyPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void InitializeTimer()

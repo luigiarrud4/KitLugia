@@ -23,6 +23,19 @@ namespace KitLugia.GUI.Pages
 
             LoadInfo();
             CheckExistingProfile();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += ScreenPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            this.Unloaded -= ScreenPage_Unloaded;
+        }
+
+        private void ScreenPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void LoadInfo()

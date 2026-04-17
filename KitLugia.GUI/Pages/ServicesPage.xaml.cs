@@ -25,6 +25,25 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             _initialTabIndex = tabIndex;
             Loaded += ServicesPage_Loaded;
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            Unloaded += ServicesPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // Limpar coleções para liberar memória
+            _allServices?.Clear();
+            GridStartup.ItemsSource = null;
+            GridServices.ItemsSource = null;
+            GridTasks.ItemsSource = null;
+            Loaded -= ServicesPage_Loaded;
+            Unloaded -= ServicesPage_Unloaded;
+        }
+
+        private void ServicesPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private async void ServicesPage_Loaded(object sender, RoutedEventArgs e)

@@ -15,7 +15,7 @@ namespace KitLugia.GUI.Pages
 {
     public partial class TraySettingsPage : Page
     {
-        private DispatcherTimer _refreshTimer;
+        private DispatcherTimer? _refreshTimer;
         private const string AutoStartRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private const string AutoStartValueName = "KitLugia";
 
@@ -24,6 +24,23 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             LoadSettings();
             StartRamRefresh();
+
+            // 🔥 LIMPEZA: Garante que recursos sejam liberados ao sair da página
+            this.Unloaded += TraySettingsPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // Para o timer de refresh
+            _refreshTimer?.Stop();
+            _refreshTimer = null;
+            this.Unloaded -= TraySettingsPage_Unloaded;
+        }
+
+        private void TraySettingsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void LoadSettings()
@@ -48,43 +65,25 @@ namespace KitLugia.GUI.Pages
             }
 
             // Background Features
-            ChkGamePriority.IsChecked = tray.GamePriorityEnabled;
             ChkStandbyClean.IsChecked = tray.StandbyCleanEnabled;
-            ChkAntiLeak.IsChecked = tray.MemoryLeakDetectionEnabled;
-            ChkFocusAssist.IsChecked = tray.FocusAssistEnabled;
             ChkTurboBoot.IsChecked = tray.TurboBootEnabled;
             ChkTurboShutdown.IsChecked = tray.TurboShutdownEnabled;
+            
+            // Close to Tray
+            ChkCloseToTray.IsChecked = tray.CloseToTray;
 
-            // Auto-start
+            // Auto-Start - usa novo método que verifica o caminho
             try
             {
-                // 🔥 CORREÇÃO: Verificar Task Scheduler em vez de Registry
-                using (var ts = new TaskService())
-                {
-                    var task = ts.GetTask("KitLugia");
-                    ChkAutoStart.IsChecked = task?.Enabled == true;
-                    
-                    // Se não encontrou tarefa, verificar fallback no Registry
-                    if (task == null)
-                    {
-                        using var regKey = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, false);
-                        ChkAutoStart.IsChecked = regKey?.GetValue(AutoStartValueName) != null;
-                    }
-                }
+                ChkAutoStart.IsChecked = TrayIconService.IsAutoStartEnabled();
             }
-            catch 
-            { 
-                // Fallback para verificação de Registry
-                try
-                {
-                    using var key = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, false);
-                    ChkAutoStart.IsChecked = key?.GetValue(AutoStartValueName) != null;
-                }
-                catch 
-                { 
-                    ChkAutoStart.IsChecked = false; 
-                }
+            catch
+            {
+                ChkAutoStart.IsChecked = false;
             }
+            
+            // Close to Tray
+            ChkCloseToTray.IsChecked = tray.CloseToTray;
 
             LoadTurboApps();
         }
@@ -203,17 +202,11 @@ namespace KitLugia.GUI.Pages
             var tray = GetTrayService();
             if (tray == null || !(sender is System.Windows.Controls.CheckBox cb)) return;
 
-            if (cb == ChkGamePriority)
-            {
-                tray.GamePriorityEnabled = cb.IsChecked == true;
-                // Removido auto-start forçado para evitar impacto na performance
-                // GameBoost agora funciona independente de auto-start
-            }
-            else if (cb == ChkStandbyClean) tray.StandbyCleanEnabled = cb.IsChecked == true;
-            else if (cb == ChkAntiLeak) tray.MemoryLeakDetectionEnabled = cb.IsChecked == true;
-            else if (cb == ChkFocusAssist) tray.FocusAssistEnabled = cb.IsChecked == true;
+            if (cb == ChkStandbyClean) tray.StandbyCleanEnabled = cb.IsChecked == true;
             else if (cb == ChkTurboBoot) tray.TurboBootEnabled = cb.IsChecked == true;
             else if (cb == ChkTurboShutdown) tray.TurboShutdownEnabled = cb.IsChecked == true;
+            else if (cb == ChkTrayIcon) tray.IsTrayEnabled = cb.IsChecked == true;
+            else if (cb == ChkCloseToTray) tray.CloseToTray = cb.IsChecked == true;
 
             tray.SaveSettings();
         }
@@ -222,28 +215,13 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
+                bool enable = ChkAutoStart.IsChecked == true;
+                
                 // 🔥 CORREÇÃO: Usar Task Scheduler em vez de Registry
-                TrayIconService.SetAutoStart(ChkAutoStart.IsChecked == true);
+                TrayIconService.SetAutoStart(enable);
                 
                 // Verificar se funcionou atualizando o estado
-                try
-                {
-                    using (var ts = new TaskService())
-                    {
-                        var task = ts.GetTask("KitLugia");
-                        bool isTaskEnabled = task?.Enabled == true;
-                        
-                        if (ChkAutoStart.IsChecked == true && !isTaskEnabled)
-                        {
-                            // Se não conseguiu criar tarefa, mostrar aviso
-                            if (Application.Current.MainWindow is MainWindow mw)
-                            {
-                                mw.ShowInfo("AVISO", "Tarefa agendada não pode ser criada. Usando fallback sem privilégios admin.");
-                            }
-                        }
-                    }
-                }
-                catch { }
+                ChkAutoStart.IsChecked = TrayIconService.IsAutoStartEnabled();
             }
             catch { }
         }
@@ -287,6 +265,16 @@ namespace KitLugia.GUI.Pages
                     LoadTurboApps();
                 }
                 else mw.ShowError("ERRO", result.Message);
+            }
+        }
+
+        private void BtnConfigureAutoClean_Click(object sender, RoutedEventArgs e)
+        {
+            // Abrir página de configurações avançada de limpeza automática
+            if (Application.Current.MainWindow is MainWindow mw)
+            {
+                var advancedPage = new AdvancedRamCleanSettingsPage();
+                mw.MainFrame.Navigate(advancedPage);
             }
         }
 

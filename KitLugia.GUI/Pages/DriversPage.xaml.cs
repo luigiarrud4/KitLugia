@@ -20,12 +20,42 @@ namespace KitLugia.GUI.Pages
     public partial class DriversPage : Page
     {
         private List<DriverItem> _allDrivers = new();
+        private CancellationTokenSource? _cts;
 
         public DriversPage()
         {
             InitializeComponent();
+            _cts = new CancellationTokenSource();
             LoadDrivers();
             CheckVerifierStatus(); // Inicia a checagem da aba Diagnóstico
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += DriversPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // 🔥 Cancela todas as tasks em background
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
+
+            // 🔥 Limpa todas as listas e bindings
+            _allDrivers?.Clear();
+            _allDrivers = null!;
+
+            if (GridDrivers != null)
+            {
+                GridDrivers.ItemsSource = null;
+                GridDrivers.Items.Clear();
+            }
+
+            this.Unloaded -= DriversPage_Unloaded;
+        }
+
+        private void DriversPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         // =========================================================
@@ -95,6 +125,8 @@ namespace KitLugia.GUI.Pages
             {
                 foreach (var driver in _allDrivers)
                 {
+                    if (_cts?.IsCancellationRequested == true) break;
+
                     driver.UpdateStatus = "Verificando...";
                     await Task.Delay(5); // Pequeno delay para a UI processar a string
 
@@ -271,6 +303,8 @@ namespace KitLugia.GUI.Pages
         {
             await Task.Run(() =>
             {
+                if (_cts?.IsCancellationRequested == true) return;
+
                 // Chama o método que restauramos no DiagnosticsManager
                 var status = Toolbox.GetDriverVerifierStatus();
 

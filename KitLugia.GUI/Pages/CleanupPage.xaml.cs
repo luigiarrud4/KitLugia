@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using KitLugia.Core;
+using KitLugia.GUI.Extensions;
 
 namespace KitLugia.GUI.Pages
 {
@@ -13,6 +14,21 @@ namespace KitLugia.GUI.Pages
         public CleanupPage()
         {
             InitializeComponent();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += CleanupPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            TxtLog?.Clear();
+            // 🔥 CORREÇÃO: Desinscreve do evento Unloaded para evitar memory leak do WPF
+            this.Unloaded -= CleanupPage_Unloaded;
+        }
+
+        private void CleanupPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void AddLog(string message)

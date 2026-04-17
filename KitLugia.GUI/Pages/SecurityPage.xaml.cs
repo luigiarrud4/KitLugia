@@ -12,6 +12,19 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             LoadState();
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            this.Unloaded += SecurityPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            this.Unloaded -= SecurityPage_Unloaded;
+        }
+
+        private void SecurityPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void LoadState()

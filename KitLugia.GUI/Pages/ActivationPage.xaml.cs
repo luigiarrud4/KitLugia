@@ -15,6 +15,14 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             Loaded += ActivationPage_Loaded;
+            // 🔥 LIMPEZA: Liberar recursos ao sair da página
+            Unloaded += ActivationPage_Unloaded;
+        }
+
+        private void ActivationPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= ActivationPage_Loaded;
+            Unloaded -= ActivationPage_Unloaded;
         }
 
         private async void ActivationPage_Loaded(object sender, RoutedEventArgs e)

@@ -51,17 +51,28 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             LoadDisks();
-            
+
             _realTimeMonitorTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(3)
             };
             _realTimeMonitorTimer.Tick += RealTimeMonitorTimer_Tick;
             _realTimeMonitorTimer.Start();
-            
-            this.Unloaded += (s, e) => {
-                _realTimeMonitorTimer?.Stop();
-            };
+
+            // 🔥 LIMPEZA: Para timer ao sair da página
+            this.Unloaded += PartitionsPage_Unloaded;
+        }
+
+        // 🔥 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            _realTimeMonitorTimer?.Stop();
+            this.Unloaded -= PartitionsPage_Unloaded;
+        }
+
+        private void PartitionsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void LoadDisks()
@@ -227,7 +238,15 @@ namespace KitLugia.GUI.Pages
             await Task.Run(() => LoadDisks());
         }
 
-        private void BtnBack_Click(object sender, RoutedEventArgs e) => NavigationService?.GoBack();
+        private void BtnBack_Click(object sender, RoutedEventArgs e)
+        {
+            // 🔥 LIMPEZA: Navegação segura que limpa histórico
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw != null)
+            {
+                mw.NavigateToPage("🔨"); // Volta para AdvancedTools
+            }
+        }
 
         private void StartCriticalOperation()
         {
