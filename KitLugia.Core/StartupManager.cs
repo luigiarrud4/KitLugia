@@ -365,7 +365,7 @@ namespace KitLugia.Core
                     }
 
                     td.Triggers.Add(trigger);
-                    td.Actions.Add(new ExecAction(appPath, arguments, Path.GetDirectoryName(appPath)));
+                    td.Actions.Add(new ExecAction(appPath, arguments, Path.GetDirectoryName(appPath) ?? ""));
 
                     td.Settings.DisallowStartIfOnBatteries = false;
                     td.Settings.StopIfGoingOnBatteries = false;
@@ -721,7 +721,7 @@ namespace KitLugia.Core
                             Delay = TimeSpan.FromSeconds(5)
                         };
                         td.Triggers.Add(trigger);
-                        td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath)));
+                        td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
                         
                         ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
                         Logger.Log("✅ Tarefa agendada criada com sucesso");
@@ -735,7 +735,7 @@ namespace KitLugia.Core
                             Logger.Log("🔧 Atualizando tarefa agendada...");
                             
                             task.Definition.Actions.Clear();
-                            task.Definition.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath)));
+                            task.Definition.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
                             task.RegisterChanges();
                             
                             Logger.Log("✅ Tarefa agendada atualizada");

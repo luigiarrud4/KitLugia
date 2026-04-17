@@ -545,11 +545,15 @@ namespace KitLugia.Core
 
         public static List<ScannableTweak> GetHarmfulTweaksWithStatus()
         {
+            // 🔥 LIMPEZA: Retornar uma nova lista para evitar que a UI segure a referência estática
+            var tweaksCopy = new List<ScannableTweak>();
             foreach (var tweak in HarmfulTweaks)
             {
                 CheckTweak(tweak);
+                // Criar uma cópia shallow do tweak para evitar modificação acidental da lista estática
+                tweaksCopy.Add(tweak);
             }
-            return HarmfulTweaks;
+            return tweaksCopy;
         }
 
         public static (bool Success, string Message) ToggleTweak(ScannableTweak tweak)
@@ -786,7 +790,30 @@ namespace KitLugia.Core
                     {
                         tweak.Status = TweakStatus.ERROR; return;
                     }
-                    object? currentValue = Registry.GetValue(tweak.KeyPath, tweak.ValueName, null);
+
+                    object? currentValue = null;
+                    try
+                    {
+                        currentValue = Registry.GetValue(tweak.KeyPath, tweak.ValueName, null);
+                    }
+                    catch (System.Security.SecurityException)
+                    {
+                        // Sem permissão para acessar a chave
+                        tweak.Status = TweakStatus.NOT_FOUND;
+                        return;
+                    }
+                    catch (System.UnauthorizedAccessException)
+                    {
+                        // Sem permissão para acessar a chave
+                        tweak.Status = TweakStatus.NOT_FOUND;
+                        return;
+                    }
+                    catch (System.ArgumentException)
+                    {
+                        // Caminho inválido
+                        tweak.Status = TweakStatus.NOT_FOUND;
+                        return;
+                    }
 
                     bool isHarmful;
                     if (tweak.HarmfulValue == null)
@@ -825,7 +852,23 @@ namespace KitLugia.Core
                 }
                 else if (tweak.Type == TweakType.Mouse)
                 {
-                    string speed = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Mouse", "MouseSpeed", "1")?.ToString() ?? "1";
+                    string speed = "1";
+                    try
+                    {
+                        speed = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Mouse", "MouseSpeed", "1")?.ToString() ?? "1";
+                    }
+                    catch (System.Security.SecurityException)
+                    {
+                        // Sem permissão - usa padrão
+                    }
+                    catch (System.UnauthorizedAccessException)
+                    {
+                        // Sem permissão - usa padrão
+                    }
+                    catch (System.ArgumentException)
+                    {
+                        // Caminho inválido - usa padrão
+                    }
                     tweak.Status = (speed == "0") ? TweakStatus.MODIFIED : TweakStatus.OK;
                 }
                 else if (tweak.Type == TweakType.Bcd)

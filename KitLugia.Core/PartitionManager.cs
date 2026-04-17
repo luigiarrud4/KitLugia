@@ -31,11 +31,18 @@ namespace KitLugia.Core
     {
         public static event Action<string>? OnLog;
         private static readonly List<string> _logBuffer = new();
+        private const int MaxLogEntries = 500; // 🔥 LIMPEZA: Limitar crescimento do log
 
         public static void Log(string message)
         {
             string entry = $"[{DateTime.Now:HH:mm:ss}] {message}";
-            _logBuffer.Add(entry);
+            lock (_logBuffer)
+            {
+                _logBuffer.Add(entry);
+                // 🔥 LIMPEZA: Remover entradas antigas se exceder limite
+                if (_logBuffer.Count > MaxLogEntries)
+                    _logBuffer.RemoveRange(0, _logBuffer.Count - MaxLogEntries);
+            }
             OnLog?.Invoke(entry);
         }
 
@@ -79,82 +86,98 @@ namespace KitLugia.Core
             try
             {
                 using var diskSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive");
-                foreach (ManagementObject disk in diskSearcher.Get())
+                using var diskResults = diskSearcher.Get();
+                foreach (ManagementObject disk in diskResults)
                 {
-                    var diskInfo = new DiskInfoEx
+                    using (disk)
                     {
-                        Index = Convert.ToUInt32(disk["Index"]),
-                        Model = disk["Model"]?.ToString() ?? "Disco Desconhecido",
-                        Interface = disk["InterfaceType"]?.ToString() ?? "Unknown",
-                        Size = Convert.ToUInt64(disk["Size"] ?? 0),
-                        MediaType = disk["MediaType"]?.ToString() ?? "",
-                        SerialNumber = disk["SerialNumber"]?.ToString()?.Trim() ?? ""
-                    };
-
-                    // Detect GPT/MBR via partition style
-                    try
-                    {
-                        using var partStyleSearcher = new ManagementObjectSearcher(
-                            $"SELECT * FROM Win32_DiskPartition WHERE DiskIndex = {diskInfo.Index}");
-                        foreach (ManagementObject part in partStyleSearcher.Get())
+                        var diskInfo = new DiskInfoEx
                         {
-                            string type = part["Type"]?.ToString() ?? "";
-                            if (type.Contains("GPT", StringComparison.OrdinalIgnoreCase))
-                            {
-                                diskInfo.PartitionStyle = "GPT";
-                                break;
-                            }
-                            else if (type.Contains("Installable", StringComparison.OrdinalIgnoreCase) ||
-                                     type.Contains("IFS", StringComparison.OrdinalIgnoreCase) ||
-                                     type.Contains("12", StringComparison.OrdinalIgnoreCase))
-                            {
-                                diskInfo.PartitionStyle = "MBR";
-                            }
-                        }
-                    }
-                    catch { diskInfo.PartitionStyle = "Desconhecido"; }
+                            Index = Convert.ToUInt32(disk["Index"]),
+                            Model = disk["Model"]?.ToString() ?? "Disco Desconhecido",
+                            Interface = disk["InterfaceType"]?.ToString() ?? "Unknown",
+                            Size = Convert.ToUInt64(disk["Size"] ?? 0),
+                            MediaType = disk["MediaType"]?.ToString() ?? "",
+                            SerialNumber = disk["SerialNumber"]?.ToString()?.Trim() ?? ""
+                        };
 
-                    // 2. Get partitions (including those without letters) via Win32_DiskPartition
-                    try
-                    {
-                        using var partSearcher = new ManagementObjectSearcher(
-                            $"SELECT * FROM Win32_DiskPartition WHERE DiskIndex = {diskInfo.Index}");
-                        
-                        foreach (ManagementObject partition in partSearcher.Get())
+                        // Detect GPT/MBR via partition style
+                        try
                         {
-                            var partInfo = new PartitionInfoEx
+                            using var partStyleSearcher = new ManagementObjectSearcher(
+                                $"SELECT * FROM Win32_DiskPartition WHERE DiskIndex = {diskInfo.Index}");
+                            using var partStyleResults = partStyleSearcher.Get();
+                            foreach (ManagementObject part in partStyleResults)
                             {
-                                Index = Convert.ToUInt32(partition["Index"]),
-                                DiskIndex = diskInfo.Index,
-                                Size = Convert.ToUInt64(partition["Size"] ?? 0),
-                                StartingOffset = Convert.ToUInt64(partition["StartingOffset"] ?? 0),
-                                Label = partition["Name"]?.ToString() ?? "Partição",
-                                Type = partition["Type"]?.ToString() ?? "Unknown"
-                            };
-
-                            // Look for drive letter via Win32_LogicalDisk
-                            try
-                            {
-                                using var logicalSearcher = new ManagementObjectSearcher(
-                                    $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
-                                foreach (ManagementObject logical in logicalSearcher.Get())
+                                using (part)
                                 {
-                                    partInfo.DriveLetter = logical["DeviceID"]?.ToString() ?? "";
-                                    partInfo.Label = logical["VolumeName"]?.ToString() ?? partInfo.Label;
-                                    partInfo.FileSystem = logical["FileSystem"]?.ToString() ?? "";
-                                    partInfo.FreeSpace = Convert.ToUInt64(logical["FreeSpace"] ?? 0);
+                                    string type = part["Type"]?.ToString() ?? "";
+                                    if (type.Contains("GPT", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        diskInfo.PartitionStyle = "GPT";
+                                        break;
+                                    }
+                                    else if (type.Contains("Installable", StringComparison.OrdinalIgnoreCase) ||
+                                             type.Contains("IFS", StringComparison.OrdinalIgnoreCase) ||
+                                             type.Contains("12", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        diskInfo.PartitionStyle = "MBR";
+                                    }
                                 }
                             }
-                            catch { }
-                            diskInfo.Partitions.Add(partInfo);
                         }
-                    }
-                    catch { }
+                        catch { diskInfo.PartitionStyle = "Desconhecido"; }
 
-                    // Sort partitions by offset and fill Gaps
-                    diskInfo.Partitions = diskInfo.Partitions.OrderBy(p => p.StartingOffset).ToList();
-                    diskInfo.UpdateWithUnallocated();
-                    disks.Add(diskInfo);
+                        // 2. Get partitions (including those without letters) via Win32_DiskPartition
+                        try
+                        {
+                            using var partSearcher = new ManagementObjectSearcher(
+                                $"SELECT * FROM Win32_DiskPartition WHERE DiskIndex = {diskInfo.Index}");
+                            using var partResults = partSearcher.Get();
+                            
+                            foreach (ManagementObject partition in partResults)
+                            {
+                                using (partition)
+                                {
+                                    var partInfo = new PartitionInfoEx
+                                    {
+                                        Index = Convert.ToUInt32(partition["Index"]),
+                                        DiskIndex = diskInfo.Index,
+                                        Size = Convert.ToUInt64(partition["Size"] ?? 0),
+                                        StartingOffset = Convert.ToUInt64(partition["StartingOffset"] ?? 0),
+                                        Label = partition["Name"]?.ToString() ?? "Partição",
+                                        Type = partition["Type"]?.ToString() ?? "Unknown"
+                                    };
+
+                                    // Look for drive letter via Win32_LogicalDisk
+                                    try
+                                    {
+                                        using var logicalSearcher = new ManagementObjectSearcher(
+                                            $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
+                                        using var logicalResults = logicalSearcher.Get();
+                                        foreach (ManagementObject logical in logicalResults)
+                                        {
+                                            using (logical)
+                                            {
+                                                partInfo.DriveLetter = logical["DeviceID"]?.ToString() ?? "";
+                                                partInfo.Label = logical["VolumeName"]?.ToString() ?? partInfo.Label;
+                                                partInfo.FileSystem = logical["FileSystem"]?.ToString() ?? "";
+                                                partInfo.FreeSpace = Convert.ToUInt64(logical["FreeSpace"] ?? 0);
+                                            }
+                                        }
+                                    }
+                                    catch { }
+                                    diskInfo.Partitions.Add(partInfo);
+                                }
+                            }
+                        }
+                        catch { }
+
+                        // Sort partitions by offset and fill Gaps
+                        diskInfo.Partitions = diskInfo.Partitions.OrderBy(p => p.StartingOffset).ToList();
+                        diskInfo.UpdateWithUnallocated();
+                        disks.Add(diskInfo);
+                    }
                 }
             }
             catch (Exception ex)
@@ -171,8 +194,11 @@ namespace KitLugia.Core
                 using var searcher = new ManagementObjectSearcher($"SELECT * FROM Win32_DiskPartition WHERE DiskIndex = {diskIndex}");
                 foreach (ManagementObject part in searcher.Get())
                 {
-                    string type = part["Type"]?.ToString() ?? "";
-                    if (type.Contains("GPT", StringComparison.OrdinalIgnoreCase)) return "GPT";
+                    using (part) // 🔥 LIMPEZA: Dispose do objeto WMI
+                    {
+                        string type = part["Type"]?.ToString() ?? "";
+                        if (type.Contains("GPT", StringComparison.OrdinalIgnoreCase)) return "GPT";
+                    }
                 }
                 return "MBR"; // Default se não achar GPT explícito
             }
@@ -187,38 +213,44 @@ namespace KitLugia.Core
                 
                 foreach (ManagementObject partition in partSearcher.Get())
                 {
-                    var partInfo = new PartitionInfoEx
+                    using (partition) // 🔥 LIMPEZA: Dispose do objeto WMI
                     {
-                        Index = Convert.ToUInt32(partition["Index"]), // Índice global do WMI, não sequencial do disco
-                        DiskIndex = diskInfo.Index,
-                        Size = Convert.ToUInt64(partition["Size"] ?? 0),
-                        StartingOffset = Convert.ToUInt64(partition["StartingOffset"] ?? 0),
-                        Label = partition["Name"]?.ToString() ?? "Volume",
-                        Type = partition["Type"]?.ToString() ?? "Unknown"
-                    };
-
-                    // Tenta associar com Letra de Unidade (Logical Disk)
-                    try
-                    {
-                        using var logicalSearcher = new ManagementObjectSearcher(
-                            $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
-                        
-                        foreach (ManagementObject logical in logicalSearcher.Get())
+                        var partInfo = new PartitionInfoEx
                         {
-                            partInfo.DriveLetter = logical["DeviceID"]?.ToString() ?? ""; // Ex: "C:"
-                            partInfo.Label = logical["VolumeName"]?.ToString() ?? partInfo.Label;
-                            partInfo.FileSystem = logical["FileSystem"]?.ToString() ?? "";
+                            Index = Convert.ToUInt32(partition["Index"]), // Índice global do WMI, não sequencial do disco
+                            DiskIndex = diskInfo.Index,
+                            Size = Convert.ToUInt64(partition["Size"] ?? 0),
+                            StartingOffset = Convert.ToUInt64(partition["StartingOffset"] ?? 0),
+                            Label = partition["Name"]?.ToString() ?? "Volume",
+                            Type = partition["Type"]?.ToString() ?? "Unknown"
+                        };
+
+                        // Tenta associar com Letra de Unidade (Logical Disk)
+                        try
+                        {
+                            using var logicalSearcher = new ManagementObjectSearcher(
+                                $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
                             
-                            // FreeSpace vem do volume lógico
-                            if (ulong.TryParse(logical["FreeSpace"]?.ToString(), out ulong free))
+                            foreach (ManagementObject logical in logicalSearcher.Get())
                             {
-                                partInfo.FreeSpace = free;
+                                using (logical) // 🔥 LIMPEZA: Dispose do objeto WMI
+                                {
+                                    partInfo.DriveLetter = logical["DeviceID"]?.ToString() ?? ""; // Ex: "C:"
+                                    partInfo.Label = logical["VolumeName"]?.ToString() ?? partInfo.Label;
+                                    partInfo.FileSystem = logical["FileSystem"]?.ToString() ?? "";
+                                    
+                                    // FreeSpace vem do volume lógico
+                                    if (ulong.TryParse(logical["FreeSpace"]?.ToString(), out ulong free))
+                                    {
+                                        partInfo.FreeSpace = free;
+                                    }
+                                }
                             }
                         }
-                    }
-                    catch { /* Pode não ter letra atribuída */ }
+                        catch { /* Pode não ter letra atribuída */ }
 
-                    diskInfo.Partitions.Add(partInfo);
+                        diskInfo.Partitions.Add(partInfo);
+                    }
                 }
             }
             catch (Exception ex)
@@ -317,10 +349,48 @@ namespace KitLugia.Core
         }
 
         // --- DELETE PARTITION ---
-        public static async Task<bool> DeletePartition(uint diskIndex, uint partitionIndex, string driveLetter)
+        public static async Task<bool> DeletePartition(uint diskIndex, uint partitionIndex, string driveLetter, bool forceDelete = false)
         {
-            Log($"Deletando partição {partitionIndex} (Disco {diskIndex})...");
-
+            Log($"Deletando partição {partitionIndex} (Disco {diskIndex}){(forceDelete ? " [FORÇADO]" : "")}...");
+            
+            // 🔥 SEGURANÇA CRÍTICA: Não permitir deletar partição do sistema (a menos que forceDelete=true)
+            if (!forceDelete)
+            {
+                if (!string.IsNullOrEmpty(driveLetter))
+                {
+                    var systemDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
+                    if (driveLetter.Replace(":", "").Equals(systemDrive, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log($"❌ ERRO CRÍTICO: Partição {driveLetter} parece ser a partição do sistema (C:).");
+                        Log("❌ Deletar a partição do sistema apagará o Windows.");
+                        Log("❌ Esta operação foi bloqueada por segurança.");
+                        return false;
+                    }
+                }
+                
+                // 🔥 SEGURANÇA: Verificar se é disco do sistema mesmo sem letra
+                if (IsSystemDisk(diskIndex))
+                {
+                    Log($"❌ ERRO CRÍTICO: Disco {diskIndex} parece ser o disco do sistema.");
+                    Log("❌ Deletar partições do disco do sistema pode tornar o Windows inoperável.");
+                    Log("❌ Esta operação foi bloqueada por segurança.");
+                    return false;
+                }
+            }
+            else
+            {
+                // 🔥 AVISO: forceDelete está ativo - operação perigosa permitida
+                Log($"⚠️ AVISO: forceDelete está ativo - verificação de segurança desabilitada.");
+                if (!string.IsNullOrEmpty(driveLetter))
+                {
+                    var systemDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
+                    if (driveLetter.Replace(":", "").Equals(systemDrive, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log($"⚠️ ATENÇÃO: Deletando partição do sistema {driveLetter} - usuário confirmou operação.");
+                    }
+                }
+            }
+            
             await EnsureVds();
 
             StringBuilder script = new();
@@ -411,6 +481,24 @@ namespace KitLugia.Core
         public static async Task<bool> CleanDisk(uint diskIndex, bool fullClean = false)
         {
             Log($"LIMPANDO Disco {diskIndex} ({(fullClean ? "COMPLETO" : "rápido")})...");
+            
+            // 🔥 SEGURANÇA CRÍTICA: Não permitir limpar disco do sistema
+            if (IsSystemDisk(diskIndex))
+            {
+                Log($"❌ ERRO CRÍTICO: Disco {diskIndex} parece ser o disco do sistema.");
+                Log("❌ Limpar o disco do sistema apagará o Windows e tornará o PC inoperável.");
+                Log("❌ Esta operação foi bloqueada por segurança.");
+                return false;
+            }
+            
+            // 🔥 SEGURANÇA: Aviso adicional se houver muitas partições
+            var disks = GetAllDisks();
+            var targetDisk = disks.FirstOrDefault(d => d.Index == diskIndex);
+            if (targetDisk != null && targetDisk.Partitions.Count(p => !p.IsUnallocated) > 0)
+            {
+                Log($"⚠️ AVISO: Disco tem {targetDisk.Partitions.Count(p => !p.IsUnallocated)} partição(ões) que serão apagadas.");
+            }
+            
             await EnsureVds();
 
             StringBuilder script = new();
@@ -425,6 +513,25 @@ namespace KitLugia.Core
         public static async Task<bool> SetActivePartition(uint diskIndex, uint partitionIndex)
         {
             Log($"Marcando partição {partitionIndex} (Disco {diskIndex}) como ATIVA...");
+            
+            // 🔥 SEGURANÇA: Verificar se o disco é MBR (active só funciona em MBR)
+            var disks = GetAllDisks();
+            var targetDisk = disks.FirstOrDefault(d => d.Index == diskIndex);
+            
+            if (targetDisk == null)
+            {
+                Log("❌ ERRO: Disco não encontrado");
+                return false;
+            }
+            
+            if (targetDisk.PartitionStyle != "MBR")
+            {
+                Log($"❌ ERRO: Disco {diskIndex} usa {targetDisk.PartitionStyle}, não MBR.");
+                Log("❌ O comando 'active' só funciona em discos MBR.");
+                Log("❌ Em discos GPT, use 'bcdedit' para definir a partição de boot.");
+                return false;
+            }
+            
             await EnsureVds();
 
             StringBuilder script = new();
@@ -458,6 +565,33 @@ namespace KitLugia.Core
         public static async Task<bool> ConvertDiskStyle(uint diskIndex, string targetStyle)
         {
             Log($"Convertendo Disco {diskIndex} para {targetStyle}...");
+            
+            // 🔥 SEGURANÇA CRÍTICA: Verificar se o disco está vazio antes de converter
+            var disks = GetAllDisks();
+            var targetDisk = disks.FirstOrDefault(d => d.Index == diskIndex);
+            
+            if (targetDisk == null)
+            {
+                Log("❌ ERRO: Disco não encontrado");
+                return false;
+            }
+            
+            if (targetDisk.Partitions.Any(p => !p.IsUnallocated))
+            {
+                Log($"❌ ERRO CRÍTICO: Disco {diskIndex} não está vazio. Tem {targetDisk.Partitions.Count(p => !p.IsUnallocated)} partição(ões).");
+                Log("❌ A conversão MBR/GPT requer que o disco esteja completamente vazio.");
+                Log("❌ Use 'Limpar Disco' primeiro para apagar todas as partições.");
+                return false;
+            }
+            
+            // 🔥 SEGURANÇA CRÍTICA: Não permitir converter disco do sistema
+            if (IsSystemDisk(diskIndex))
+            {
+                Log($"❌ ERRO CRÍTICO: Disco {diskIndex} parece ser o disco do sistema.");
+                Log("❌ Converter o disco do sistema pode tornar o Windows inoperável.");
+                return false;
+            }
+            
             await EnsureVds();
 
             StringBuilder script = new();
@@ -466,6 +600,28 @@ namespace KitLugia.Core
             script.AppendLine("exit");
 
             return await RunDiskpartScript(script.ToString(), "convert");
+        }
+        
+        // 🔥 SEGURANÇA: Verifica se o disco é o disco do sistema
+        private static bool IsSystemDisk(uint diskIndex)
+        {
+            try
+            {
+                var systemPartition = Environment.SystemDirectory; // C:\Windows
+                var systemDrive = Path.GetPathRoot(systemPartition); // C:\
+                
+                var disks = GetAllDisks();
+                var systemDisk = disks.FirstOrDefault(d => 
+                    d.Partitions.Any(p => p.DriveLetter == systemDrive?.Replace(":", ""))
+                );
+                
+                return systemDisk?.Index == diskIndex;
+            }
+            catch
+            {
+                // Se não conseguir determinar, assume que é seguro não bloquear
+                return false;
+            }
         }
 
         // --- REMOVE DRIVE LETTER ---
@@ -620,7 +776,8 @@ namespace KitLugia.Core
             if (!capOk) { Log("Falha na captura da imagem."); return false; }
 
             progressCallback?.Invoke(50, "Excluindo partição original...");
-            bool delOk = await DeletePartition(diskIndex, partitionIndex, driveLetter);
+            // 🔥 forceDelete=true para permitir operações avançadas (move de partição do sistema)
+            bool delOk = await DeletePartition(diskIndex, partitionIndex, driveLetter, forceDelete: true);
             if (!delOk) { Log("Falha ao excluir partição original."); return false; }
 
             await Task.Delay(2000); // Wait for VDS refresh
@@ -672,7 +829,8 @@ namespace KitLugia.Core
 
             // 2. Excluir Partição Origem (Liberação Total de Espaço)
             progressCallback?.Invoke(60, "Liberando espaço físico (Excluindo origem)...");
-            bool delOk = await DeletePartition(sourceDisk, sourcePart, sourceLetter);
+            // 🔥 forceDelete=true para permitir operações avançadas (merge de partição do sistema)
+            bool delOk = await DeletePartition(sourceDisk, sourcePart, sourceLetter, forceDelete: true);
             if (!delOk) { Log("Falha ao liberar espaço físico."); return false; }
 
             await Task.Delay(2000); // Estabilização VDS
@@ -716,7 +874,8 @@ namespace KitLugia.Core
 
             // 2. Delete
             progressCallback?.Invoke(50, "Limpando estrutura bloqueada...");
-            if (!await DeletePartition(diskIndex, partIndex, driveLetter)) return false;
+            // 🔥 forceDelete=true para permitir operações avançadas (extend de partição do sistema)
+            if (!await DeletePartition(diskIndex, partIndex, driveLetter, forceDelete: true)) return false;
 
             await Task.Delay(2000);
 

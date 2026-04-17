@@ -320,7 +320,7 @@ namespace KitLugia.Core
         private static string CreateUpdateScript(string newExePath, string currentExePath, string extractDir)
         {
             var scriptPath = Path.Combine(Path.GetTempPath(), "update_kitlugia.bat");
-            var currentDir = Path.GetDirectoryName(currentExePath);
+            var currentDir = Path.GetDirectoryName(currentExePath) ?? string.Empty;
             
             var script = $@"
 @echo off
@@ -357,7 +357,7 @@ if errorlevel 1 (
 )
 
 echo Copiando outros arquivos necessarios...
-xcopy ""{Path.GetDirectoryName(newExePath)}\*"" ""{currentDir}"" /E /H /C /I /Y /EXCLUDE:update_exclude.txt
+xcopy ""{(Path.GetDirectoryName(newExePath) ?? string.Empty)}\*"" ""{currentDir}"" /E /H /C /I /Y /EXCLUDE:update_exclude.txt
 
 echo Limpando arquivos temporários...
 rd /s /q ""{extractDir}""

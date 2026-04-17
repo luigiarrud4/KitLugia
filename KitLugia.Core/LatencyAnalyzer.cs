@@ -68,8 +68,9 @@ namespace KitLugia.Core
         #region Measurement Methods
 
         private static long _frequency;
-        private static readonly List<double> _latencySamples = new();
-        private static readonly Dictionary<string, List<double>> _driverStats = new();
+        // 🔥 LIMPEZA: Não usar static para dados de instância - causa memory leak
+        private static readonly ThreadLocal<List<double>> _latencySamples = new(() => new List<double>());
+        private static readonly ThreadLocal<Dictionary<string, List<double>>> _driverStats = new(() => new Dictionary<string, List<double>>());
 
         static LatencyAnalyzer()
         {
@@ -84,8 +85,8 @@ namespace KitLugia.Core
                 TopDrivers = new List<DriverLatencyInfo>()
             };
 
-            _latencySamples.Clear();
-            _driverStats.Clear();
+            _latencySamples.Value?.Clear();
+            _driverStats.Value?.Clear();
 
             var sw = Stopwatch.StartNew();
             var processStartTime = Process.GetCurrentProcess().StartTime;
@@ -94,7 +95,7 @@ namespace KitLugia.Core
             while (sw.Elapsed.TotalSeconds < durationSeconds && !cancellationToken.IsCancellationRequested)
             {
                 double sample = MeasureSingleLatency();
-                _latencySamples.Add(sample);
+                _latencySamples.Value?.Add(sample);
 
                 await Task.Delay(10, cancellationToken);
             }
@@ -103,14 +104,15 @@ namespace KitLugia.Core
             CollectDriverStats();
 
             // Calcula estatísticas
-            if (_latencySamples.Count > 0)
+            var samples = _latencySamples.Value;
+            if (samples != null && samples.Count > 0)
             {
-                measurement.CurrentLatencyUs = _latencySamples.Last();
-                measurement.MaxLatencyUs = _latencySamples.Max();
-                measurement.AvgLatencyUs = _latencySamples.Average();
+                measurement.CurrentLatencyUs = samples.Last();
+                measurement.MaxLatencyUs = samples.Max();
+                measurement.AvgLatencyUs = samples.Average();
                 
                 // Remove outliers para média mais precisa
-                var sorted = _latencySamples.OrderBy(x => x).ToList();
+                var sorted = samples.OrderBy(x => x).ToList();
                 int removeCount = (int)(sorted.Count * 0.05); // Remove 5% de cada extremo
                 if (sorted.Count > removeCount * 2)
                 {
@@ -124,8 +126,9 @@ namespace KitLugia.Core
             measurement.IsrTimeUs = GetIsrTime();
             measurement.HardPageFaults = GetHardPageFaultCount();
 
-            // Processa estatísticas de drivers
-            measurement.TopDrivers = _driverStats
+            // Coleta estatísticas de drivers
+            var driverStats = _driverStats.Value;
+            measurement.TopDrivers = driverStats?
                 .Select(kvp => new DriverLatencyInfo
                 {
                     DriverName = kvp.Key,
@@ -135,9 +138,13 @@ namespace KitLugia.Core
                 })
                 .OrderByDescending(d => d.MaxExecutionTimeUs)
                 .Take(5)
-                .ToList();
+                .ToList() ?? new List<DriverLatencyInfo>();
 
             Logger.Log($"Latência medida: Atual={measurement.CurrentLatencyUs:F2}µs, Média={measurement.AvgLatencyUs:F2}µs, Máx={measurement.MaxLatencyUs:F2}µs");
+
+            // 🔥 LIMPEZA: Limpar ThreadLocal para evitar acúmulo de memória
+            _latencySamples.Value?.Clear();
+            _driverStats.Value?.Clear();
 
             return measurement;
         }
@@ -219,9 +226,10 @@ namespace KitLugia.Core
             try
             {
                 // Estimativa baseada em amostras de latência
-                if (_latencySamples.Count > 0)
+                var samples = _latencySamples.Value;
+                if (samples != null && samples.Count > 0)
                 {
-                    double avgLatency = _latencySamples.Average();
+                    double avgLatency = samples.Average();
                     // Se latência média > 100µs, DPC provavelmente está alto
                     return avgLatency > 100 ? avgLatency / 10 : avgLatency / 20;
                 }
@@ -267,25 +275,33 @@ namespace KitLugia.Core
             // Chama apenas uma vez por análise, não a cada 100ms
             try
             {
-                if (_driverStats.Count > 0) return; // Já coletou nesta sessão
+                if (_driverStats.Value?.Count > 0) return; // Já coletou nesta sessão
                 
                 using var searcher = new ManagementObjectSearcher(
                     "SELECT Name FROM Win32_SystemDriver WHERE State = 'Running'");
+                using var results = searcher.Get();
                 
-                foreach (ManagementObject driver in searcher.Get())
+                foreach (ManagementObject driver in results)
                 {
                     try
                     {
-                        string name = driver["Name"]?.ToString() ?? "Unknown";
-                        
-                        if (!_driverStats.ContainsKey(name))
+                        using (driver)
                         {
-                            _driverStats[name] = new List<double>();
+                            string name = driver["Name"]?.ToString() ?? "Unknown";
+                            
+                            var stats = _driverStats.Value;
+                            if (stats != null)
+                            {
+                                if (!stats.ContainsKey(name))
+                                {
+                                    stats[name] = new List<double>();
+                                }
+                                
+                                // Simula latência do driver baseado em drivers conhecidos
+                                double simulatedLatency = SimulateDriverLatency(name);
+                                stats[name].Add(simulatedLatency);
+                            }
                         }
-                        
-                        // Simula latência do driver baseado em drivers conhecidos
-                        double simulatedLatency = SimulateDriverLatency(name);
-                        _driverStats[name].Add(simulatedLatency);
                     }
                     catch
                     {
@@ -363,45 +379,64 @@ namespace KitLugia.Core
             {
                 // Detecta CPU
                 using (var searcher = new ManagementObjectSearcher("SELECT Name, NumberOfCores FROM Win32_Processor"))
+                using (var results = searcher.Get())
                 {
-                    foreach (ManagementObject obj in searcher.Get())
+                    foreach (ManagementObject obj in results)
                     {
-                        profile.CpuName = obj["Name"]?.ToString() ?? "Unknown";
-                        profile.CpuCores = Convert.ToInt32(obj["NumberOfCores"]);
-                        break;
+                        using (obj)
+                        {
+                            profile.CpuName = obj["Name"]?.ToString() ?? "Unknown";
+                            profile.CpuCores = Convert.ToInt32(obj["NumberOfCores"]);
+                            break;
+                        }
                     }
                 }
 
                 // Detecta GPU
                 using (var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_VideoController"))
+                using (var results = searcher.Get())
                 {
-                    foreach (ManagementObject obj in searcher.Get())
+                    foreach (ManagementObject obj in results)
                     {
-                        string gpuName = obj["Name"]?.ToString() ?? "Unknown";
-                        if (profile.GpuName == null)
+                        using (obj)
                         {
-                            profile.GpuName = gpuName;
-                            profile.HasNvidia = gpuName.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase);
-                            profile.HasAmd = gpuName.Contains("AMD", StringComparison.OrdinalIgnoreCase) || 
-                                           gpuName.Contains("Radeon", StringComparison.OrdinalIgnoreCase);
-                            profile.HasIntel = gpuName.Contains("Intel", StringComparison.OrdinalIgnoreCase);
+                            string gpuName = obj["Name"]?.ToString() ?? "Unknown";
+                            if (profile.GpuName == null)
+                            {
+                                profile.GpuName = gpuName;
+                                profile.HasNvidia = gpuName.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase);
+                                profile.HasAmd = gpuName.Contains("AMD", StringComparison.OrdinalIgnoreCase) || 
+                                               gpuName.Contains("Radeon", StringComparison.OrdinalIgnoreCase);
+                                profile.HasIntel = gpuName.Contains("Intel", StringComparison.OrdinalIgnoreCase);
+                            }
                         }
                     }
                 }
 
                 // Detecta RAM
                 using (var searcher = new ManagementObjectSearcher("SELECT Capacity FROM Win32_PhysicalMemory"))
+                using (var results = searcher.Get())
                 {
                     ulong totalRam = 0;
-                    foreach (ManagementObject obj in searcher.Get())
+                    foreach (ManagementObject obj in results)
                     {
-                        totalRam += Convert.ToUInt64(obj["Capacity"]);
+                        using (obj)
+                        {
+                            totalRam += Convert.ToUInt64(obj["Capacity"]);
+                        }
                     }
                     profile.TotalRamGB = (int)(totalRam / (1024 * 1024 * 1024));
                 }
 
                 // Detecta versão do Windows
-                profile.WindowsVersion = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "DisplayVersion", "Unknown")?.ToString() ?? "Unknown";
+                try
+                {
+                    profile.WindowsVersion = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "DisplayVersion", "Unknown")?.ToString() ?? "Unknown";
+                }
+                catch
+                {
+                    profile.WindowsVersion = "Unknown";
+                }
                 profile.IsWindows11 = Environment.OSVersion.Version.Build >= 22000;
 
                 Logger.Log($"Hardware detectado: {profile.CpuName}, {profile.GpuName}, {profile.TotalRamGB}GB RAM");

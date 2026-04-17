@@ -142,11 +142,26 @@ namespace KitLugia.Core
 
         public static async Task<(bool Success, string Message)> RestartGraphicsDriver()
         {
-            var gpus = SystemTweaks.GetAllGpus();
-            var gpu = gpus.Find(g => g["Name"]?.ToString()?.Contains("NVIDIA") == true || g["Name"]?.ToString()?.Contains("AMD") == true);
-
-            if (gpu == null) return (false, "GPU não detectada.");
-            string pnpId = gpu["PNPDeviceID"]?.ToString() ?? "";
+            // 🔥 Usa método seguro que não retorna ManagementObject
+            var gpuNames = SystemTweaks.GetAllGpuNames();
+            var gpuName = gpuNames.FirstOrDefault(n => n.Contains("NVIDIA") || n.Contains("AMD"));
+            
+            if (string.IsNullOrEmpty(gpuName)) return (false, "GPU não detectada.");
+            
+            // Obtém PNPDeviceID de forma segura via registry
+            string? regPath = SystemTweaks.FindGpuRegistryPathByDescription(gpuName);
+            string pnpId = "";
+            if (!string.IsNullOrEmpty(regPath))
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(regPath.Replace("HKEY_LOCAL_MACHINE\\", ""));
+                    pnpId = key?.GetValue("MatchingDeviceId")?.ToString() ?? "";
+                }
+                catch { }
+            }
+            
+            if (string.IsNullOrEmpty(pnpId)) return (false, "Não foi possível obter o ID da GPU.");
 
             try
             {

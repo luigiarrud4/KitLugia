@@ -8,7 +8,11 @@ namespace KitLugia.Core
     [SupportedOSPlatform("windows")]
     public static class BootloaderPackager
     {
-        private const string CloverDownloadsPath = @"C:\Users\Lugia\Downloads\CLOVER";
+        private static string CloverDownloadsPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads",
+            "CLOVER"
+        );
 
         /// <summary>
         /// Copia os arquivos necessários do Clover para a partição de boot.
@@ -18,7 +22,7 @@ namespace KitLugia.Core
             try
             {
                 if (!Directory.Exists(CloverDownloadsPath))
-                    return (false, "Pasta do Clover não encontrada nos Downloads.");
+                    return (false, $"Pasta do Clover não encontrada em {CloverDownloadsPath}.");
 
                 string efiFile = Path.Combine(CloverDownloadsPath, "CLOVERX64.efi");
                 if (!File.Exists(efiFile))

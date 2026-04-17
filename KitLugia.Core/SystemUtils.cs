@@ -33,7 +33,8 @@ namespace KitLugia.Core
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT TotalVisibleMemorySize FROM Win32_OperatingSystem");
-                var mem = searcher.Get().Cast<ManagementObject>().FirstOrDefault()?["TotalVisibleMemorySize"];
+                using var results = searcher.Get();
+                var mem = results.Cast<ManagementObject>().FirstOrDefault()?["TotalVisibleMemorySize"];
                 if (mem != null)
                 {
                     ulong totalRamKB = Convert.ToUInt64(mem);
@@ -119,10 +120,11 @@ namespace KitLugia.Core
         public static List<RestorePointModel> GetRestorePoints()
         {
             var points = new List<RestorePointModel>();
+            ManagementScope? scope = null;
             try
             {
                 // Conecta ao WMI na raiz padrão
-                ManagementScope scope = new ManagementScope("\\\\localhost\\root\\default");
+                scope = new ManagementScope("\\\\localhost\\root\\default");
                 ObjectQuery query = new ObjectQuery("SELECT * FROM SystemRestore");
                 using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
                 using ManagementObjectCollection results = searcher.Get();

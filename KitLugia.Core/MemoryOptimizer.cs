@@ -203,7 +203,7 @@ namespace KitLugia.Core
             try
             {
                 long luid;
-                if (!LookupPrivilegeValue(null, privilegeName, out luid))
+                if (!LookupPrivilegeValue(string.Empty, privilegeName, out luid))
                     return;
 
                 var tp = new TOKEN_PRIVILEGES

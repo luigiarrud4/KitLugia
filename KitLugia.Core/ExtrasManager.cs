@@ -179,12 +179,26 @@ del List.txt
 
         public static bool AreHiddenFilesVisible()
         {
-            return (int)(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", 2) ?? 2) == 1;
+            try
+            {
+                return (int)(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", 2) ?? 2) == 1;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static bool AreExtensionsVisible()
         {
-            return (int)(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", 1) ?? 1) == 0;
+            try
+            {
+                return (int)(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", 1) ?? 1) == 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static (bool Success, string Message) ToggleHiddenFiles()

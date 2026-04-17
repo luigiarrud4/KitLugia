@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Runtime.Versioning;
+using Microsoft.Win32;
 
 namespace KitLugia.Core
 {
@@ -13,19 +14,28 @@ namespace KitLugia.Core
         /// <returns>Uma tupla contendo (bool isEnabled, string gpuName).</returns>
         public static (bool isEnabled, string gpuName) GetMsiStatus()
         {
-            // Busca a primeira GPU que não seja o "Adaptador de Vídeo Básico da Microsoft",
-            // garantindo que estamos lidando com a placa de vídeo real.
-            var gpu = SystemTweaks.GetAllGpus().FirstOrDefault(g =>
-                g["Name"]?.ToString()?.Contains("Microsoft Basic") == false);
+            // 🔥 Usa método seguro que não retorna ManagementObject
+            var gpuNames = SystemTweaks.GetAllGpuNames();
+            var gpuName = gpuNames.FirstOrDefault(n => !n.Contains("Microsoft Basic"));
 
             // Se nenhuma GPU for encontrada, retorna um status seguro.
-            if (gpu == null)
+            if (string.IsNullOrEmpty(gpuName))
             {
                 return (false, "Nenhuma GPU detectada");
             }
 
-            string gpuName = gpu["Name"]?.ToString() ?? "GPU Desconhecida";
-            string pnpDeviceId = gpu["PNPDeviceID"]?.ToString() ?? string.Empty;
+            // Obtém PNPDeviceID de forma segura via registry
+            string? regPath = SystemTweaks.FindGpuRegistryPathByDescription(gpuName);
+            string pnpDeviceId = string.Empty;
+            if (!string.IsNullOrEmpty(regPath))
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(regPath.Replace("HKEY_LOCAL_MACHINE\\", ""));
+                    pnpDeviceId = key?.GetValue("MatchingDeviceId")?.ToString() ?? string.Empty;
+                }
+                catch { }
+            }
 
             // Se não conseguirmos o ID do dispositivo, não podemos prosseguir.
             if (string.IsNullOrEmpty(pnpDeviceId))

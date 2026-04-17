@@ -6,12 +6,19 @@ using System.Management;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Ookii.AnswerFile;
 
 namespace KitLugia.Core
 {
     public static class WinbootManager
     {
         public const string WINBOOT_LABEL = "KITLUGIA";
+        
+        // Caminho de instalação dinâmico - usa Program Files em vez de C:\KitLugia
+        public static string KitLugiaInstallPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "KitLugia"
+        );
 
         static WinbootManager()
         {
@@ -29,59 +36,370 @@ namespace KitLugia.Core
             catch { return false; }
         }
 
+        /// <summary>
+        /// Gera um arquivo autounattend.xml usando a biblioteca Ookii.AnswerFile
+        /// </summary>
+        public static void GenerateAutounattendXml(string outputPath, bool bypassRequirements = true, bool localAccount = true, bool disablePrivacy = true, string? userName = "Usuario", string? password = null, bool fullAuto = true, bool disableDefender = false, bool autoLogon = true, bool remoteDesktop = false, string language = "pt-BR", string timeZone = "E. South America Standard Time", string[]? commands = null,
+            bool showAllEditions = false, bool disableBitlocker = true, bool disableHibernate = false, bool disableCopilot = true, bool removeEdge = false, bool removeCortana = true, bool removeOneDrive = false, bool disableSpotlight = true, bool disableNews = true, bool disableChat = true,
+            bool disableAutoUpdate = false, bool disableDeliveryOpt = true, bool delayUpdates = false, bool longPaths = true, bool disableLocation = true, bool disableActivity = true, bool disableAdID = true, bool disableErrorReporting = true, bool disableInkWorkspace = false,
+            bool disableSmartScreen = false, bool disableDefenderSandbox = false, bool disableUAC = false, bool hideEula = true, bool hideOEM = true, bool hideWireless = true, bool hideOnlineAccount = true, bool protectYourPC = true, string computerName = "")
+        {
+            try
+            {
+                var options = new AnswerFileOptions
+                {
+                    // Instalação manual (usuário seleciona disco/partição durante setup)
+                    InstallOptions = new ManualInstallOptions(),
+
+                    // Configurações de idioma e região
+                    Language = language,
+                    TimeZone = timeZone,
+                    ProcessorArchitecture = "amd64"
+                };
+
+                // Adicionar conta local se especificado
+                if (localAccount && !string.IsNullOrEmpty(userName))
+                {
+                    var credential = new LocalCredential(
+                        userName,
+                        password ?? string.Empty, // Senha vazia se não especificada
+                        "Administrators"
+                    );
+                    options.LocalAccounts.Add(credential);
+                }
+
+                // Desabilitar Windows Defender se solicitado
+                if (disableDefender)
+                {
+                    options.EnableDefender = false;
+                }
+
+                // Desabilitar Cloud features se privacy desabilitado
+                if (disablePrivacy)
+                {
+                    options.EnableCloud = false;
+                }
+
+                // Habilitar Área de Trabalho Remota se solicitado
+                if (remoteDesktop)
+                {
+                    options.EnableRemoteDesktop = true;
+                }
+
+                // Configurar AutoLogon para instalação totalmente automática
+                if (autoLogon && !string.IsNullOrEmpty(userName))
+                {
+                    var domainUser = new DomainUser(userName); // Usuário local (domain = null)
+                    var credential = new DomainCredential(domainUser, password ?? string.Empty);
+                    options.AutoLogon = new AutoLogonOptions(credential)
+                    {
+                        Count = 1
+                    };
+                }
+
+                // Adicionar comandos pós-instalação se especificados
+                if (commands != null && commands.Length > 0)
+                {
+                    foreach (var cmd in commands)
+                    {
+                        if (!string.IsNullOrWhiteSpace(cmd))
+                        {
+                            options.FirstLogonCommands.Add(cmd.Trim());
+                        }
+                    }
+                }
+
+                // Adicionar comandos de registry e tweaks
+                var registryCommands = new List<string>();
+
+                // Bypass de requisitos do Windows 11
+                if (bypassRequirements)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassTPMCheck /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassSecureBootCheck /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassStorageCheck /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassCPUCheck /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassRAMCheck /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassDiskCheck /t REG_DWORD /d 1 /f");
+                }
+
+                // Mostrar todas as edições do Windows
+                if (showAllEditions)
+                {
+                    registryCommands.Add("cmd.exe /c del /f /q X:\\Sources\\ei.cfg");
+                    registryCommands.Add("cmd.exe /c echo [Channel] > X:\\Sources\\ei.cfg");
+                    registryCommands.Add("cmd.exe /c echo _Default >> X:\\Sources\\ei.cfg");
+                    registryCommands.Add("cmd.exe /c echo [VL] >> X:\\Sources\\ei.cfg");
+                    registryCommands.Add("cmd.exe /c echo 0 >> X:\\Sources\\ei.cfg");
+                }
+
+                // Bypass de Microsoft Account
+                if (localAccount)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f");
+                }
+
+                // Desabilitar BitLocker
+                if (disableBitlocker)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\BitLocker\" /v \"PreventDeviceEncryption\" /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\EnhancedStorageDevices\" /v TCGSecurityActivationDisabled /t REG_DWORD /d 1 /f");
+                }
+
+                // Desabilitar Hibernação
+                if (disableHibernate)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\System\\CurrentControlSet\\Control\\Session Manager\\Power\" /v HibernateEnabled /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FlyoutMenuSettings\" /v ShowHibernateOption /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar Windows Copilot
+                if (disableCopilot)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot\" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f");
+                }
+
+                // Desabilitar Cortana
+                if (removeCortana)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\Software\\Policies\\Microsoft\\Windows\\Windows Search\" /v AllowCortana /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar Windows Spotlight
+                if (disableSpotlight)
+                {
+                    registryCommands.Add("reg.exe add \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent\" /v DisableWindowsSpotlightOnLockScreen /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent\" /v DisableWindowsConsumerFeatures /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent\" /v DisableWindowsSpotlightActiveUser /t REG_DWORD /d 1 /f");
+                }
+
+                // Desabilitar News and Interests
+                if (disableNews)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Dsh\" /v AllowNewsAndInterests /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar Chat/Teams
+                if (disableChat)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Communications\" /v ConfigureChatAutoInstall /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Chat\" /v \"ChatIcon\" /t REG_DWORD /d 3 /f");
+                }
+
+                // Desabilitar atualizações automáticas
+                if (disableAutoUpdate)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU\" /v NoAutoUpdate /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU\" /v AutoInstallMinorUpdates /t REG_DWORD /d 0 /f");
+                }
+
+                // Atrasar atualizações
+                if (delayUpdates)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU\" /v AUOptions /t REG_DWORD /d 3 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\" /v DeferFeatureUpdates /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\" /v DeferFeatureUpdatesPeriodInDays /t REG_DWORD /d 365 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\" /v DeferQualityUpdates /t REG_DWORD /d 1 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\" /v DeferQualityUpdatesPeriodInDays /t REG_DWORD /d 365 /f");
+                }
+
+                // Desabilitar Delivery Optimization
+                if (disableDeliveryOpt)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization\" /v DODownloadMode /t REG_DWORD /d 0 /f");
+                }
+
+                // Habilitar Long File Paths
+                if (longPaths)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\" /v LongPathsEnabled /t REG_DWORD /d 1 /f");
+                }
+
+                // Desabilitar Location Tracking
+                if (disableLocation)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location\" /v Value /t REG_SZ /d Deny /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Sensor\\Overrides\\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}\" /v SensorPermissionState /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\lfsvc\\Service\\Configuration\" /v Status /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SYSTEM\\Maps\" /v AutoUpdateEnabled /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar Activity History
+                if (disableActivity)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\" /v EnableActivityFeed /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\" /v PublishUserActivities /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\" /v UploadUserActivities /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar Advertising ID
+                if (disableAdID)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\AdvertisingInfo\" /v DisabledByGroupPolicy /t REG_DWORD /d 1 /f");
+                }
+
+                // Desabilitar Windows Error Reporting
+                if (disableErrorReporting)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Error Reporting\" /v Disabled /t REG_DWORD /d 1 /f");
+                }
+
+                // Desabilitar Windows Ink Workspace
+                if (disableInkWorkspace)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsInkWorkspace\" /v AllowWindowsInkWorkspace /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar SmartScreen
+                if (disableSmartScreen)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\" /v SmartScreenEnabled /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppHost\" /v EnableWebContentEvaluation /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar Sandbox do Defender
+                if (disableDefenderSandbox)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Features\" /v TamperProtection /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("powershell.exe -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\"");
+                }
+
+                // Desabilitar UAC
+                if (disableUAC)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v EnableLUA /t REG_DWORD /d 0 /f");
+                }
+
+                // Desabilitar Telemetria
+                if (disablePrivacy)
+                {
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\DataCollection\" /v AllowTelemetry /t REG_DWORD /d 0 /f");
+                    registryCommands.Add("reg.exe add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection\" /v AllowTelemetry /t REG_DWORD /d 0 /f");
+                }
+
+                // Adicionar comandos de registry ao FirstLogonCommands
+                foreach (var cmd in registryCommands)
+                {
+                    options.FirstLogonCommands.Add(cmd);
+                }
+
+                // Configurar nome do computador se especificado
+                if (!string.IsNullOrEmpty(computerName))
+                {
+                    options.ComputerName = computerName;
+                }
+
+                // Remover Edge se solicitado (requer script PowerShell)
+                if (removeEdge)
+                {
+                    options.FirstLogonCommands.Add("powershell.exe -ExecutionPolicy Bypass -Command \"Invoke-WebRequest -Uri 'https://github.com/ShadowWhisperer/Remove-MS-Edge/blob/main/Remove-NoTerm.exe?raw=true' -OutFile '%TEMP%\\Remove-NoTerm.exe'\"");
+                    options.FirstLogonCommands.Add("cmd.exe /c \"%TEMP%\\Remove-NoTerm.exe /silent /install\"");
+                }
+
+                // Remover OneDrive se solicitado
+                if (removeOneDrive)
+                {
+                    options.FirstLogonCommands.Add("powershell.exe -Command \"Get-AppxPackage *OneDrive* | Remove-AppxPackage\"");
+                }
+
+                // Gerar o arquivo usando o método estático
+                AnswerFileGenerator.Generate(outputPath, options);
+
+                Log($"Arquivo autounattend.xml gerado com sucesso em: {outputPath}");
+                Log($"Configurações: Bypass={bypassRequirements}, LocalAccount={localAccount}, DisablePrivacy={disablePrivacy}, FullAuto={fullAuto}, ShowAllEditions={showAllEditions}, DisableBitlocker={disableBitlocker}, RemoveEdge={removeEdge}, RemoveCortana={removeCortana}, RemoveOneDrive={removeOneDrive}");
+            }
+            catch (Exception ex)
+            {
+                Log($"Erro ao gerar autounattend.xml: {ex.Message}");
+                throw;
+            }
+        }
+
         // --- DISK ENGINE ---
-        public static List<DiskInfo> GetDisks(bool filterWinboot = false)
+        public static List<DiskInfo> GetDisks(bool filterWinboot = false, bool safeMode = false)
         {
             var disks = new List<DiskInfo>();
             try
             {
                 using var diskDriveQuery = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive");
-                foreach (ManagementObject diskDrive in diskDriveQuery.Get())
+                using var diskResults = diskDriveQuery.Get();
+                foreach (ManagementObject diskDrive in diskResults)
                 {
-                    var disk = new DiskInfo
+                    using (diskDrive)
                     {
-                        Index = (uint)diskDrive["Index"],
-                        Model = diskDrive["Model"]?.ToString() ?? "Desconhecido",
-                        Interface = diskDrive["InterfaceType"]?.ToString() ?? "USB/SATA/NVMe",
-                        Size = (ulong)diskDrive["Size"]
-                    };
-
-                    using var partitionQuery = new ManagementObjectSearcher($"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='{diskDrive["DeviceID"]}'}} WHERE AssocClass=Win32_DiskDriveToDiskPartition");
-                    foreach (ManagementObject partition in partitionQuery.Get())
-                    {
-                        var partInfo = new PartitionInfo
+                        var disk = new DiskInfo
                         {
-                            Index = (uint)partition["Index"],
-                            DiskIndex = disk.Index,
-                            Name = partition["Name"]?.ToString() ?? "Partição",
-                            Size = (ulong)partition["Size"]
+                            Index = (uint)diskDrive["Index"],
+                            Model = diskDrive["Model"]?.ToString() ?? "Desconhecido",
+                            Interface = diskDrive["InterfaceType"]?.ToString() ?? "USB/SATA/NVMe",
+                            Size = (ulong)diskDrive["Size"]
                         };
 
-                        using var logicalDiskQuery = new ManagementObjectSearcher($"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
-                        foreach (ManagementObject logicalDisk in logicalDiskQuery.Get())
+                        using var partitionQuery = new ManagementObjectSearcher($"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='{diskDrive["DeviceID"]}'}} WHERE AssocClass=Win32_DiskDriveToDiskPartition");
+                        using var partitionResults = partitionQuery.Get();
+                        foreach (ManagementObject partition in partitionResults)
                         {
-                            partInfo.DriveLetter = logicalDisk["DeviceID"]?.ToString() ?? string.Empty;
-                            partInfo.Label = logicalDisk["VolumeName"]?.ToString() ?? string.Empty;
-                            partInfo.FileSystem = logicalDisk["FileSystem"]?.ToString() ?? "RAW";
-                            partInfo.FreeSpace = (ulong)logicalDisk["FreeSpace"];
-                        }
-                        if (filterWinboot)
-                        {
-                            // 20GB mínimo (Garante ocultação total de MSR, EFI, Recovery e do Winboot de 8GB)
-                            if (partInfo.Size < 20000000000) continue; 
-                            
-                            if (partInfo.Name.Contains("Reserved", StringComparison.OrdinalIgnoreCase)) continue;
-                            if (partInfo.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase)) continue;
-                            if (partInfo.Label.Equals("Winboot", StringComparison.OrdinalIgnoreCase)) continue;
-                            if (partInfo.Label.Equals("Reservado", StringComparison.OrdinalIgnoreCase)) continue;
-                            if (partInfo.Label.Contains("System", StringComparison.OrdinalIgnoreCase)) continue;
-                            if (partInfo.Label.Contains("Sistema", StringComparison.OrdinalIgnoreCase)) continue;
-                            if (partInfo.Label.Contains("Recuperação", StringComparison.OrdinalIgnoreCase)) continue;
-                        }
+                            using (partition)
+                            {
+                                var partInfo = new PartitionInfo
+                                {
+                                    Index = (uint)partition["Index"],
+                                    DiskIndex = disk.Index,
+                                    Name = partition["Name"]?.ToString() ?? "Partição",
+                                    Size = (ulong)partition["Size"]
+                                };
 
-                        disk.Partitions.Add(partInfo);
+                                using var logicalDiskQuery = new ManagementObjectSearcher($"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
+                                using var logicalResults = logicalDiskQuery.Get();
+                                foreach (ManagementObject logicalDisk in logicalResults)
+                                {
+                                    using (logicalDisk)
+                                    {
+                                        partInfo.DriveLetter = logicalDisk["DeviceID"]?.ToString() ?? string.Empty;
+                                        partInfo.Label = logicalDisk["VolumeName"]?.ToString() ?? string.Empty;
+                                        partInfo.FileSystem = logicalDisk["FileSystem"]?.ToString() ?? "RAW";
+                                        partInfo.FreeSpace = (ulong)logicalDisk["FreeSpace"];
+                                    }
+                                }
+                                if (filterWinboot)
+                                {
+                                    // 20GB mínimo (Garante ocultação total de MSR, EFI, Recovery e do Winboot de 8GB)
+                                    if (partInfo.Size < 20000000000) continue;
+
+                                    if (safeMode)
+                                    {
+                                        // 🔥 MODO SEGURO - Não usa strings de texto, apenas verificações estruturais
+                                        // MSR, EFI, Recovery são geralmente < 20GB ou têm tipos específicos
+                                        // Winboot é identificado pelo label WINBOOT_LABEL
+                                        if (partInfo.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase)) continue;
+                                        if (partInfo.Label.Equals("Winboot", StringComparison.OrdinalIgnoreCase)) continue;
+                                    }
+                                    else
+                                    {
+                                        // 🔥 FALLBACKS PARA MÚLTIPLOS IDIOMAS - Funciona com ISOs em qualquer idioma
+                                        // System partitions (English, Portuguese, Spanish, French, German, Italian, Russian, Chinese, Japanese, Korean)
+                                        string[] systemLabels = { "System", "Sistema", "Système", "Systemlaufwerk", "Sistema operativo", "Система", "系统", "システム", "시스템" };
+                                        if (systemLabels.Any(l => partInfo.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
+
+                                        // Recovery partitions (English, Portuguese, Spanish, French, German, Italian, Russian, Chinese, Japanese, Korean)
+                                        string[] recoveryLabels = { "Recovery", "Recuperação", "Recuperación", "Récupération", "Wiederherstellung", "Ripristino", "Восстановление", "恢复", "復旧", "복구" };
+                                        if (recoveryLabels.Any(l => partInfo.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
+
+                                        // Reserved partitions (English, Portuguese, Spanish, French, German, Italian, Russian, Chinese, Japanese, Korean)
+                                        string[] reservedLabels = { "Reserved", "Reservado", "Reservado", "Réservé", "Reserviert", "Riservato", "Зарезервировано", "保留", "予約", "예약" };
+                                        if (reservedLabels.Any(l => partInfo.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
+
+                                        // Winboot partitions (para não selecionar a própria partição Winboot)
+                                        if (partInfo.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase)) continue;
+                                        if (partInfo.Label.Equals("Winboot", StringComparison.OrdinalIgnoreCase)) continue;
+                                    }
+                                }
+
+                                disk.Partitions.Add(partInfo);
+                            }
+                        }
+                        disks.Add(disk);
                     }
-                    disks.Add(disk);
                 }
             }
             catch (Exception ex) { Logger.Log($"Erro WinbootManager.GetDisks: {ex.Message}"); }
@@ -563,11 +881,12 @@ namespace KitLugia.Core
             });
         }
 
-        public static async Task<bool> ApplyCustomizations(string winbootDrive, bool bypassRequirements, bool localAccount, bool disablePrivacy, bool injectKit, bool autoCleanup, string? customXmlPath, string? userName, string? password, bool fullAuto, uint targetDisk, uint targetPartition, string? injectedFilesPath = null)
+        public static async Task<bool> ApplyCustomizations(string winbootDrive, bool bypassRequirements, bool localAccount, bool disablePrivacy, bool injectKit, bool autoCleanup, string? customXmlPath, string? userName, string? password, bool fullAuto, uint targetDisk, uint targetPartition, string? injectedFilesPath = null, bool safeMode = false, Func<string, Task<bool>>? downloadConfirmationCallback = null)
         {
-            Log($"Aplicando customizações na unidade {winbootDrive} (Modo: PADRÃO)...");
+            var modeText = safeMode ? "MODO SEGURO (Sem strings de texto - 100% universal)" : "PADRÃO";
+            Log($"Aplicando customizações na unidade {winbootDrive} (Modo: {modeText})...");
 
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 try
                 {
@@ -645,6 +964,97 @@ namespace KitLugia.Core
                             CopyDirectory(appSource, Path.Combine(setupDir, "App"));
                         }
 
+                        // 🔥 Download automático do .NET Runtime se não existir localmente
+                        string dotnetRuntimeSource = Path.Combine(goodiesPath, "dotnet-runtime.exe");
+
+                        if (!File.Exists(dotnetRuntimeSource))
+                        {
+                            Log("Instalador offline do .NET Runtime não encontrado.");
+                            Log("O KitLugia pode baixar automaticamente o .NET Desktop Runtime 8.0 (~50MB) para instalação offline.");
+
+                            // Pergunta ao usuário se deseja baixar (se callback fornecido)
+                            bool shouldDownload = true;
+                            if (downloadConfirmationCallback != null)
+                            {
+                                try
+                                {
+                                    shouldDownload = await downloadConfirmationCallback(
+                                        "O instalador do .NET Desktop Runtime 8.0 não foi encontrado localmente.\n\n" +
+                                        "Deseja baixar automaticamente (~50MB)?\n\n" +
+                                        "- Sim: Baixa automaticamente e salva para uso futuro\n" +
+                                        "- Não: O Winboot tentará instalar via winget na primeira inicialização (requer internet)"
+                                    );
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log($"⚠️ Erro ao obter confirmação de download: {ex.Message}");
+                                    Log("Baixando automaticamente...");
+                                }
+                            }
+                            else
+                            {
+                                Log("Callback não fornecido. Baixando automaticamente...");
+                            }
+
+                            if (shouldDownload)
+                            {
+                                Log("Iniciando download automático...");
+                                try
+                                {
+                                    // URL direto do Microsoft CDN para .NET Desktop Runtime 8.0.15 x64 (LTS)
+                                    string dotnetUrl = "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.15/windowsdesktop-runtime-8.0.15-win-x64.exe";
+                                    string tempDownloadPath = Path.Combine(Path.GetTempPath(), "windowsdesktop-runtime-8.0.15-win-x64.exe");
+
+                                    Log($"Baixando .NET Runtime de: {dotnetUrl}");
+                                    Log("Isso pode levar alguns minutos (tamanho aproximado: 50MB)...");
+
+                                    using (var client = new System.Net.WebClient())
+                                    {
+                                        client.DownloadProgressChanged += (sender, e) =>
+                                        {
+                                            if (e.ProgressPercentage % 10 == 0 && e.ProgressPercentage > 0)
+                                            {
+                                                Log($"Download: {e.ProgressPercentage}% ({e.BytesReceived / 1024 / 1024}MB / {e.TotalBytesToReceive / 1024 / 1024}MB)");
+                                            }
+                                        };
+                                        client.DownloadFile(dotnetUrl, tempDownloadPath);
+                                    }
+
+                                    // Copia para Resources para uso futuro
+                                    File.Copy(tempDownloadPath, dotnetRuntimeSource, true);
+                                    Log("✅ .NET Runtime baixado com sucesso e salvo em Resources!");
+
+                                    // Limpa arquivo temporário
+                                    try { File.Delete(tempDownloadPath); } catch { }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log($"⚠️ Falha ao baixar .NET Runtime automaticamente: {ex.Message}");
+                                    Log("O Winboot prosseguirá normalmente e tentará instalar via winget na primeira inicialização (requer internet).");
+                                }
+                            }
+                            else
+                            {
+                                Log("Download cancelado pelo usuário.");
+                                Log("O Winboot prosseguirá normalmente e tentará instalar via winget na primeira inicialização (requer internet).");
+                            }
+                        }
+                        else
+                        {
+                            Log("✅ Instalador offline do .NET Runtime encontrado localmente.");
+                        }
+
+                        // Copiar instalador offline do .NET Runtime para a partição Winboot
+                        if (File.Exists(dotnetRuntimeSource))
+                        {
+                            Log("Copiando instalador offline do .NET Runtime 8.0 para a partição Winboot...");
+                            File.Copy(dotnetRuntimeSource, Path.Combine(setupDir, "dotnet-runtime.exe"), true);
+                        }
+                        else
+                        {
+                            Log("AVISO: Instalador offline do .NET Runtime não disponível. O Winboot tentará instalar via winget (requer internet).");
+                        }
+
                         if (autoCleanup)
                         {
                             Log("Gerando script de auto-limpeza (Cleanup)...");
@@ -679,7 +1089,7 @@ namespace KitLugia.Core
                                           "echo Removendo entrada de boot (BCD)...\n" +
                                           "for /f \"tokens=2 delims={}\" %%a in ('bcdedit /enum all ^| findstr /c:\"KitLugia Winboot Setup\" /B /S') do bcdedit /delete {%%a} /f > nul 2>&1\n" +
                                           "schtasks /delete /tn \"KitLugiaCleanup\" /f > nul 2>&1\n" +
-                                          "echo Limpeza concluida. A pasta C:\\KitLugia foi mantida conforme solicitado.\n" +
+                                          "echo Limpeza concluida. A pasta " + KitLugiaInstallPath + " foi mantida conforme solicitado.\n" +
                                           "timeout /t 3 > nul\n" +
                                           "exit";
                             File.WriteAllText(Path.Combine(setupDir, "cleanup.bat"), cleanupBat);
@@ -698,28 +1108,41 @@ namespace KitLugia.Core
                         sb.AppendLine("echo   KITLUGIA AUTOMATION - NAO FECHE ESTA JANELA");
                         sb.AppendLine("echo =========================================");
                         sb.AppendLine("echo Aplicando ajustes finais no sistema...");
-                        
-                        // Verificar e instalar .NET Desktop Runtime 8.0 se necessário
+
+                        // Verificar e instalar .NET Desktop Runtime 8.0 se necessário (usando instalador offline)
                         sb.AppendLine("echo Verificando requisitos de sistema (.NET 8)...");
-                        sb.AppendLine("powershell -NoProfile -Command \"if (!(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' | Where-Object { $_.DisplayName -like '*.NET Desktop Runtime 8.0*' })) { echo 'Instalando .NET Desktop Runtime 8.0 (pode levar alguns minutos)...'; winget install Microsoft.DotNet.DesktopRuntime.8 --silent --accept-package-agreements --accept-source-agreements }\"");
+                        sb.AppendLine("reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\" /s | findstr \".NET Desktop Runtime 8\" > nul 2>&1");
+                        sb.AppendLine("if errorlevel 1 (");
+                        sb.AppendLine("  echo .NET Desktop Runtime 8.0 nao encontrado. Instalando...");
+                        sb.AppendLine("  if exist \"%~dp0dotnet-runtime.exe\" (");
+                        sb.AppendLine("    echo Executando instalador offline (pode levar alguns minutos)...");
+                        sb.AppendLine("    \"%~dp0dotnet-runtime.exe\" /install /quiet /norestart");
+                        sb.AppendLine("    echo .NET Desktop Runtime 8.0 instalado com sucesso.");
+                        sb.AppendLine("  ) else (");
+                        sb.AppendLine("    echo AVISO: Instalador offline nao encontrado. Tentando via winget...");
+                        sb.AppendLine("    winget install Microsoft.DotNet.DesktopRuntime.8 --silent --accept-package-agreements --accept-source-agreements");
+                        sb.AppendLine("  )");
+                        sb.AppendLine(") else (");
+                        sb.AppendLine("  echo .NET Desktop Runtime 8.0 ja esta instalado.");
+                        sb.AppendLine(")");
 
                         sb.AppendLine("timeout /t 5 > nul");
                         
                         if (injectKit)
                         {
                             sb.AppendLine("echo Instalando KitLugia (Robocopy Mode)...");
-                            sb.AppendLine("if not exist \"C:\\KitLugia\" mkdir \"C:\\KitLugia\"");
-                            sb.AppendLine($"robocopy \"%~dp0App\" \"C:\\KitLugia\" /E /R:3 /W:5 /MT /NP");
+                            sb.AppendLine($"if not exist \"{KitLugiaInstallPath}\" mkdir \"{KitLugiaInstallPath}\"");
+                            sb.AppendLine($"robocopy \"%~dp0App\" \"{KitLugiaInstallPath}\" /E /R:3 /W:5 /MT /NP");
                             
                             // Copiar o script de limpeza para o C: para execução persistente e segura
                             if (autoCleanup)
                             {
-                                sb.AppendLine("copy /Y \"%~dp0cleanup.bat\" \"C:\\KitLugia\\cleanup.bat\"");
+                                sb.AppendLine($"copy /Y \"%~dp0cleanup.bat\" \"{KitLugiaInstallPath}\\cleanup.bat\"");
                             }
 
                             // Criar Atalhos no Desktop via PowerShell
                             sb.AppendLine("echo Criando atalhos na Area de Trabalho...");
-                            string psLaunch = "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\KitLugia.lnk');$s.TargetPath='C:\\KitLugia\\KitLugia.GUI.exe';$s.WorkingDirectory='C:\\KitLugia';$s.Save()";
+                            string psLaunch = $"$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\KitLugia.lnk');$s.TargetPath='{KitLugiaInstallPath}\\KitLugia.GUI.exe';$s.WorkingDirectory='{KitLugiaInstallPath}';$s.Save()";
                             sb.AppendLine($"powershell -NoProfile -Command \"{psLaunch}\"");
                         }
 
@@ -733,23 +1156,23 @@ namespace KitLugia.Core
                         if (autoCleanup)
                         {
                             // Atalho para Cleanup Manual se falhar o automático
-                            string psCleanup = "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\Restaurar_Espaco_Lugia.lnk');$s.TargetPath='C:\\KitLugia\\cleanup.bat';$s.IconLocation='C:\\Windows\\System32\\shell32.dll,238';$s.Save()";
+                            string psCleanup = $"$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\Restaurar_Espaco_Lugia.lnk');$s.TargetPath='{KitLugiaInstallPath}\\cleanup.bat';$s.IconLocation='C:\\Windows\\System32\\shell32.dll,238';$s.Save()";
                             sb.AppendLine($"powershell -NoProfile -Command \"{psCleanup}\"");
 
                             sb.AppendLine("echo Iniciando limpeza automatica (Modo Persistente)...");
                             // Tenta limpar na hora via o script local no C:
-                            sb.AppendLine("start /min \"\" cmd /c \"call C:\\KitLugia\\cleanup.bat\"");
+                            sb.AppendLine($"start /min \"\" cmd /c \"call {KitLugiaInstallPath}\\cleanup.bat\"");
                             
                             // Agendar tarefa persistente de limpeza (SYSTEM) para o Logon
                             // Roda o script que está no C:, que não será deletado
                             sb.AppendLine("echo Agendando limpeza persistente no proximo logon...");
-                            sb.AppendLine($"schtasks /create /tn \"KitLugiaCleanup\" /tr \"cmd /c \\\"C:\\KitLugia\\cleanup.bat\\\"\" /sc onlogon /rl highest /f");
+                            sb.AppendLine($"schtasks /create /tn \"KitLugiaCleanup\" /tr \"cmd /c \\\"{KitLugiaInstallPath}\\cleanup.bat\\\"\" /sc onlogon /rl highest /f");
                         }
                         
                         if (injectKit)
                         {
                             sb.AppendLine("echo Abrindo KitLugia...");
-                            sb.AppendLine("start \"\" \"C:\\KitLugia\\KitLugia.GUI.exe\""); 
+                            sb.AppendLine($"start \"\" \"{KitLugiaInstallPath}\\KitLugia.GUI.exe\""); 
                         }
 
                         sb.AppendLine("echo Concluido! Esta janela fechara em instantes.");
@@ -1159,52 +1582,210 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
         }
 
 
-        public static async Task<bool> CleanBcdEntriesAsync()
+        public class BcdEntry
         {
-            Log("Limpando entradas do menu de Boot (KitLugia & Linux)...");
+            public string Guid { get; set; } = string.Empty;
+            public string Description { get; set; } = string.Empty;
+            public string Reason { get; set; } = string.Empty;
+            public string Type { get; set; } = string.Empty;
+            public bool IsCritical { get; set; } = false;
+        }
+
+        public static async Task<List<BcdEntry>> ScanBcdEntriesAsync()
+        {
+            Log("Escaneando entradas do menu de Boot (KitLugia & Linux)...");
+            var entries = new List<BcdEntry>();
+
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    var (enumCode, enumOutput) = RunProcessCaptured("bcdedit.exe", "/enum all /v").GetAwaiter().GetResult();
+
+                    if (enumCode != 0)
+                    {
+                        Log($"FALHA BCDEDIT: {enumOutput}");
+                        return entries;
+                    }
+
+                    // 🔥 ESTRATÉGIA 1: Busca por descrições conhecidas do KitLugia
+                    string[] descriptionPatterns = {
+                        @"(description|descriç[ãa]o|descricao|beschreibung|descripción|description)\s+(KitLugia|Generic|Linux|Sergei|Winboot|Multi-ISO)",
+                        @"(description|descriç[ãa]o|descricao|beschreibung|descripción|description)\s+.*\b(KITLUGIA|LUGIA)\b",
+                        @"(description|descriç[ãa]o|descricao|beschreibung|descripción|description)\s+.*\b(WINBOOT)\b"
+                    };
+
+                    // 🔥 ESTRATÉGIA 2: Busca por device que aponta para partição Winboot
+                    var winbootPartitions = GetDisks(false, false).SelectMany(d => d.Partitions)
+                        .Where(p => p.Label.Contains("KITLUGIA", StringComparison.OrdinalIgnoreCase) ||
+                                   p.Label.Contains("Winboot", StringComparison.OrdinalIgnoreCase))
+                        .Select(p => p.DriveLetter.Replace(":", ""))
+                        .ToList();
+
+                    string[] blocks = enumOutput.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+                    foreach (string block in blocks)
+                    {
+                        string? guid = null;
+                        var guidMatch = Regex.Match(block, @"(identifier|identificador)\s+({[a-fA-F0-9-]+})", RegexOptions.IgnoreCase);
+                        if (guidMatch.Success)
+                        {
+                            guid = guidMatch.Groups[2].Value;
+                        }
+
+                        // Segurança Absoluta (marcar OS base como crítico)
+                        bool isCritical = false;
+                        if (guid != null && (guid.Equals("{bootmgr}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{current}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{default}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{fwbootmgr}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{memdiag}", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            isCritical = true;
+                        }
+
+                        // Extrai descrição
+                        string description = "Sem descrição";
+                        var descMatch = Regex.Match(block, @"(description|descriç[ãa]o|descricao)\s+(.+)", RegexOptions.IgnoreCase);
+                        if (descMatch.Success)
+                        {
+                            description = descMatch.Groups[2].Value.Trim();
+                        }
+
+                        // Extrai tipo de aplicação
+                        string type = "Desconhecido";
+                        var appMatch = Regex.Match(block, @"application\s+(\w+)", RegexOptions.IgnoreCase);
+                        if (appMatch.Success)
+                        {
+                            type = appMatch.Groups[1].Value;
+                        }
+
+                        bool shouldInclude = false;
+                        string? reason = null;
+
+                        // Estratégia 1: Busca por descrições
+                        foreach (var pattern in descriptionPatterns)
+                        {
+                            if (Regex.IsMatch(block, pattern, RegexOptions.IgnoreCase))
+                            {
+                                shouldInclude = true;
+                                reason = "Descrição KitLugia/Linux";
+                                break;
+                            }
+                        }
+
+                        // Estratégia 2: Busca por device que aponta para partição Winboot
+                        if (!shouldInclude && winbootPartitions.Count > 0)
+                        {
+                            var deviceMatch = Regex.Match(block, @"(device|dispositivo)\s+partition=([A-Z]:)", RegexOptions.IgnoreCase);
+                            if (deviceMatch.Success)
+                            {
+                                string driveLetter = deviceMatch.Groups[2].Value;
+                                if (winbootPartitions.Contains(driveLetter.Replace(":", "")))
+                                {
+                                    shouldInclude = true;
+                                    reason = $"Aponta para partição Winboot ({driveLetter})";
+                                }
+                            }
+                        }
+
+                        // Estratégia 3: Busca por ramdisksdidevice (entradas WIM)
+                        if (!shouldInclude && winbootPartitions.Count > 0)
+                        {
+                            var ramdiskMatch = Regex.Match(block, @"ramdisksdidevice\s+partition=([A-Z]:)", RegexOptions.IgnoreCase);
+                            if (ramdiskMatch.Success)
+                            {
+                                string driveLetter = ramdiskMatch.Groups[1].Value;
+                                if (winbootPartitions.Contains(driveLetter.Replace(":", "")))
+                                {
+                                    shouldInclude = true;
+                                    reason = $"Ramdisk aponta para Winboot ({driveLetter})";
+                                }
+                            }
+                        }
+
+                        // Estratégia 4: Busca por application bootsector (Legacy)
+                        if (!shouldInclude)
+                        {
+                            var appMatch2 = Regex.Match(block, @"application\s+bootsector", RegexOptions.IgnoreCase);
+                            if (appMatch2.Success)
+                            {
+                                var deviceMatch = Regex.Match(block, @"(device|dispositivo)\s+partition=([A-Z]:)", RegexOptions.IgnoreCase);
+                                if (deviceMatch.Success)
+                                {
+                                    string driveLetter = deviceMatch.Groups[2].Value;
+                                    if (winbootPartitions.Contains(driveLetter.Replace(":", "")))
+                                    {
+                                        shouldInclude = true;
+                                        reason = $"Bootsector aponta para Winboot ({driveLetter})";
+                                    }
+                                }
+                            }
+                        }
+
+                        // Incluir se encontrou pelo menos uma estratégia OU se for crítico (para mostrar ao usuário)
+                        if ((shouldInclude && guid != null) || isCritical)
+                        {
+                            entries.Add(new BcdEntry
+                            {
+                                Guid = guid ?? "",
+                                Description = description,
+                                Reason = reason ?? (isCritical ? "Entrada crítica do sistema" : ""),
+                                Type = type,
+                                IsCritical = isCritical
+                            });
+                        }
+                    }
+
+                    Log($"Escaneamento BCD concluído. {entries.Count} entradas encontradas.");
+                    return entries;
+                }
+                catch (Exception ex)
+                {
+                    Log($"Erro ao escanear BCD: {ex.Message}");
+                    return entries;
+                }
+            });
+        }
+
+        public static async Task<bool> CleanBcdEntriesAsync(List<string>? guidsToDelete = null)
+        {
+            if (guidsToDelete == null || guidsToDelete.Count == 0)
+            {
+                Log("Nenhuma entrada para remover.");
+                return true;
+            }
+
+            Log($"Limpando {guidsToDelete.Count} entradas do menu de Boot...");
             return await Task.Run(async () =>
             {
                 try
                 {
-                    var (enumCode, enumOutput) = await RunProcessCaptured("bcdedit.exe", "/enum all /v");
-                    
-                    if (enumCode != 0) 
+                    foreach (string guid in guidsToDelete)
                     {
-                        Log($"FALHA BCDEDIT: {enumOutput}");
-                    }
-                    
-                    // Separa a saída em blocos (cada entrada do BCD é separada por linha dupla)
-                    string[] blocks = enumOutput.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
-                    
-                    foreach (string block in blocks)
-                    {
-                        // Verifica se no bloco (entrada BCD) existe a descrição alvo
-                        bool isTarget = Regex.IsMatch(block, @"(description|descriç[ãa]o|descricao)\s+(KitLugia|Generic|Linux|Sergei)", RegexOptions.IgnoreCase);
-                        
-                        if (isTarget)
+                        // Não deletar entradas críticas do sistema
+                        if (guid.Equals("{bootmgr}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{current}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{default}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{fwbootmgr}", StringComparison.OrdinalIgnoreCase) ||
+                            guid.Equals("{memdiag}", StringComparison.OrdinalIgnoreCase))
                         {
-                            var match = Regex.Match(block, @"(identifier|identificador)\s+({[a-fA-F0-9-]+})", RegexOptions.IgnoreCase);
-                            if (match.Success)
-                            {
-                                string guid = match.Groups[2].Value;
-                                
-                                // Segurança Absoluta (nunca deletar OS base)
-                                if (guid.Equals("{bootmgr}", StringComparison.OrdinalIgnoreCase) || 
-                                    guid.Equals("{current}", StringComparison.OrdinalIgnoreCase) ||
-                                    guid.Equals("{default}", StringComparison.OrdinalIgnoreCase)) 
-                                {
-                                    continue;
-                                }
-
-                                Log($"Removendo entrada BCD ghost antiga encontrada: {guid}");
-                                await RunProcessCaptured("bcdedit.exe", $"/delete {guid} /f");
-                            }
+                            Log($"⚠️ Pulando entrada crítica: {guid}");
+                            continue;
                         }
+
+                        Log($"Removendo entrada BCD: {guid}");
+                        await RunProcessCaptured("bcdedit.exe", $"/delete {guid} /f");
                     }
 
                     // Limpa também o bootsequence se houver algo travado lá
                     await RunProcessCaptured("bcdedit.exe", "/set {fwbootmgr} displayorder {bootmgr} /addfirst");
                     await RunProcessCaptured("bcdedit.exe", "/deletevalue {fwbootmgr} bootsequence");
+
+                    // Limpa também o displayorder do bootmgr para remover referências fantasma
+                    await RunProcessCaptured("bcdedit.exe", "/deletevalue {bootmgr} displayorder");
+
+                    Log($"Limpeza BCD concluída. {guidsToDelete.Count} entradas removidas.");
                     return true;
                 }
                 catch (Exception ex)
@@ -1215,9 +1796,15 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             });
         }
 
-        public static async Task<bool> RemoveWinboot(PartitionInfo? specificTarget = null)
+        public static async Task<List<BcdEntry>> ScanWinbootForCleanup()
         {
-            Log("Iniciando remoção do Winboot...");
+            Log("Escaneando Winboot para limpeza...");
+            return await ScanBcdEntriesAsync();
+        }
+
+        public static async Task<bool> RemoveWinboot(PartitionInfo? specificTarget = null, bool safeMode = false, List<string>? customGuids = null)
+        {
+            Log(customGuids != null ? $"Iniciando remoção do Winboot ({customGuids.Count} GUIDs customizados)..." : "Iniciando remoção do Winboot...");
             return await Task.Run(async () =>
             {
                 // Tenta iniciar VDS (Safe Mode Fix)
@@ -1229,13 +1816,30 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 try
                 {
                     // 1. Remover entradas do BCD
-                    await CleanBcdEntriesAsync();
+                    if (customGuids != null)
+                    {
+                        // Remove GUIDs customizados (selecionados pelo usuário)
+                        await CleanBcdEntriesAsync(customGuids);
+                    }
+                    else
+                    {
+                        // Modo automático: remove tudo
+                        await CleanBcdEntriesAsync();
+                    }
 
                     // 2. Destruir Partição Alvo
                     StringBuilder dpScript = new StringBuilder();
                     
                     if (specificTarget != null)
                     {
+                        // 🔥 SEGURANÇA CRÍTICA: Verificar se não é partição do sistema
+                        var systemDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
+                        if (specificTarget.DriveLetter.Replace(":", "").Equals(systemDrive, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Log($"❌ ERRO CRÍTICO: Tentando deletar partição do sistema {specificTarget.DriveLetter}. Operação abortada.");
+                            return false;
+                        }
+                        
                         // Remoção Direta via Seleção do Usuário
                          Log($"Removendo ALVO SELECIONADO: Volume {specificTarget.DriveLetter} ({specificTarget.Label})...");
                          // Tenta pegar o numero do volume usando diskpart filter (mais seguro que confiar no index antigo)
@@ -1263,6 +1867,16 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                         foreach (Match m in volMatches)
                         {
                             string volNum = m.Groups[1].Value;
+                            string volLetter = m.Groups[2].Value;
+                            
+                            // 🔥 SEGURANÇA CRÍTICA: Não deletar volume do sistema
+                            var systemDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
+                            if (!string.IsNullOrEmpty(volLetter) && volLetter.Equals(systemDrive, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Log($"❌ ERRO CRÍTICO: Volume {volNum} ({volLetter}) parece ser o volume do sistema. Pulando.");
+                                continue;
+                            }
+                            
                             Log($"Agendando remoção do Volume {volNum}...");
                             dpScript.AppendLine($"select volume {volNum}");
                             dpScript.AppendLine("delete partition override");
@@ -1271,7 +1885,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
 
                     // 3. Tentar estender a unidade principal (C: ou a primeira com letra)
-                    var disks = GetDisks();
+                    var disks = GetDisks(false, safeMode);
                     string? sourceLetter = null;
                     foreach(var d in disks)
                     {
@@ -1317,11 +1931,21 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             });
         }
 
-        public static async Task<bool> CreateBootPartition(string sourceDriveLetter, int sizeMb, string label, bool multiIso = false)
+        public static async Task<bool> CreateBootPartition(string sourceDriveLetter, int sizeMb, string label, bool multiIso = false, bool safeMode = false)
         {
             Log($"Iniciando criação de partição no disco de origem {sourceDriveLetter} (Multi-ISO: {multiIso})...");
             return await Task.Run(async () =>
             {
+                // 🔥 SEGURANÇA CRÍTICA: Verificar se não está criando no disco do sistema
+                var sysDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
+                if (sourceDriveLetter.Replace(":", "").Equals(sysDrive, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log($"❌ ERRO CRÍTICO: Tentando criar partição Winboot na partição do sistema {sourceDriveLetter}.");
+                    Log("❌ Isso pode causar problemas de boot e instabilidade.");
+                    Log("❌ Use uma partição de dados (D:, E:, etc) para criar o Winboot.");
+                    return false;
+                }
+                
                 // 0. VDS (Safe Mode Fix)
                 try 
                 {
@@ -1335,40 +1959,73 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 var existingPartitions = GetRemovablePartitions();
                 if (existingPartitions.Any())
                 {
-                    Log($"Encontrada(s) {existingPartitions.Count} partição(ões) Winboot existente(s). Removendo antes de criar nova...");
+                    Log($"Encontrada(s) {existingPartitions.Count} partição(ões) Winboot existente(s).");
                     
-                    // Limpa BCD primeiro
-                    var (enumCode, enumOutput) = await RunProcessCaptured("bcdedit.exe", "/enum all");
-                    string bcdPattern = @"(identifier|identificador)\s+({[a-fA-F0-9-]+})[\s\S]*?description\s+(KitLugia Winboot Setup|Sergei Strelec PE|Generic Multi-ISO / Linux)";
-                    var bcdMatches = Regex.Matches(enumOutput, bcdPattern, RegexOptions.IgnoreCase);
-                    foreach (Match m in bcdMatches)
+                    // 🔥 SEGURANÇA: Verificar se as partições são realmente Winboot antes de deletar
+                    var validWinbootPartitions = existingPartitions.Where(p =>
+                        !string.IsNullOrEmpty(p.Label) && (
+                            p.Label.Contains("KITLUGIA", StringComparison.OrdinalIgnoreCase) ||
+                            p.Label.Contains("Winboot", StringComparison.OrdinalIgnoreCase) ||
+                            p.Label.Contains("Multi-ISO", StringComparison.OrdinalIgnoreCase) ||
+                            p.Label.Contains("PE", StringComparison.OrdinalIgnoreCase)
+                        )
+                    ).ToList();
+                    
+                    if (validWinbootPartitions.Count != existingPartitions.Count)
                     {
-                        string guid = m.Groups[2].Value;
-                        Log($"Removendo entrada BCD antiga: {guid}");
-                        await RunProcessCaptured("bcdedit.exe", $"/delete {guid} /f");
+                        Log($"⚠️ AVISO: {existingPartitions.Count - validWinbootPartitions.Count} partição(ões) não parecem ser Winboot e NÃO serão deletadas.");
+                        Log("⚠️ Somente partições com labels contendo 'KITLUGIA', 'Winboot', 'Multi-ISO' ou 'PE' serão removidas.");
                     }
-
-                    // Deleta cada partição antiga e estende o volume de origem
-                    foreach (var oldPart in existingPartitions)
+                    
+                    if (validWinbootPartitions.Any())
                     {
-                        string letter = oldPart.DriveLetter.Replace(":", "");
-                        if (string.IsNullOrEmpty(letter)) continue;
+                        Log($"Removendo {validWinbootPartitions.Count} partição(ões) Winboot legítima(s) antes de criar nova...");
                         
-                        Log($"Deletando partição antiga: {letter}: ({oldPart.Label})");
-                        StringBuilder cleanScript = new StringBuilder();
-                        cleanScript.AppendLine($"select volume {letter}");
-                        cleanScript.AppendLine("delete partition override");
-                        cleanScript.AppendLine($"select volume {sourceDriveLetter}");
-                        cleanScript.AppendLine("extend");
-                        cleanScript.AppendLine("exit");
+                        // Limpa BCD primeiro
+                        var (enumCode, enumOutput) = await RunProcessCaptured("bcdedit.exe", "/enum all");
+                        string bcdPattern = @"(identifier|identificador)\s+({[a-fA-F0-9-]+})[\s\S]*?description\s+(KitLugia Winboot Setup|Sergei Strelec PE|Generic Multi-ISO / Linux)";
+                        var bcdMatches = Regex.Matches(enumOutput, bcdPattern, RegexOptions.IgnoreCase);
+                        foreach (Match m in bcdMatches)
+                        {
+                            string guid = m.Groups[2].Value;
+                            Log($"Removendo entrada BCD antiga: {guid}");
+                            await RunProcessCaptured("bcdedit.exe", $"/delete {guid} /f");
+                        }
 
-                        string cleanPath = Path.Combine(Path.GetTempPath(), "winboot_cleanup_dp.txt");
-                        File.WriteAllText(cleanPath, cleanScript.ToString());
-                        var (cleanExit, cleanOut) = await RunProcessCaptured("diskpart.exe", $"/s \"{cleanPath}\"");
-                        Log(cleanOut);
-                        File.Delete(cleanPath);
+                        // Deleta cada partição antiga e estende o volume de origem
+                        foreach (var oldPart in validWinbootPartitions)
+                        {
+                            string letter = oldPart.DriveLetter.Replace(":", "");
+                            if (string.IsNullOrEmpty(letter)) continue;
+                            
+                            // 🔥 SEGURANÇA: Verificação adicional - não deletar partição do sistema
+                            var systemDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
+                            if (letter.Equals(systemDrive, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Log($"❌ ERRO CRÍTICO: Tentando deletar partição do sistema {letter}:. Operação abortada.");
+                                continue;
+                            }
+                            
+                            Log($"Deletando partição antiga: {letter}: ({oldPart.Label})");
+                            StringBuilder cleanScript = new StringBuilder();
+                            cleanScript.AppendLine($"select volume {letter}");
+                            cleanScript.AppendLine("delete partition override");
+                            cleanScript.AppendLine($"select volume {sourceDriveLetter}");
+                            cleanScript.AppendLine("extend");
+                            cleanScript.AppendLine("exit");
+
+                            string cleanPath = Path.Combine(Path.GetTempPath(), "winboot_cleanup_dp.txt");
+                            File.WriteAllText(cleanPath, cleanScript.ToString());
+                            var (cleanExit, cleanOut) = await RunProcessCaptured("diskpart.exe", $"/s \"{cleanPath}\"");
+                            Log(cleanOut);
+                            File.Delete(cleanPath);
+                        }
+                        Log("Limpeza de Winboot anterior concluída. Espaço restaurado.");
                     }
-                    Log("Limpeza de Winboot anterior concluída. Espaço restaurado.");
+                    else
+                    {
+                        Log("⚠️ Nenhuma partição Winboot legítima encontrada para deletar. Continuando...");
+                    }
                 }
 
                 // 2. DETECÇÃO MBR/GPT ROBUSTA via PowerShell
@@ -1398,9 +2055,12 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                         {
                             foreach (ManagementObject partition in searcher.Get())
                             {
-                                string partType = partition["Type"]?.ToString() ?? "";
-                                if (partType.Contains("GPT", StringComparison.OrdinalIgnoreCase)) isGpt = true;
-                                break;
+                                using (partition) // 🔥 LIMPEZA: Dispose do objeto WMI
+                                {
+                                    string partType = partition["Type"]?.ToString() ?? "";
+                                    if (partType.Contains("GPT", StringComparison.OrdinalIgnoreCase)) isGpt = true;
+                                    break;
+                                }
                             }
                         }
                     } catch { }
@@ -1426,7 +2086,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 // NUNCA aplicamos em discos fixos (SSD/HDD) para não sequestrar o boot do host.
                 bool isRemovable = false;
                 try {
-                    var disks = GetDisks();
+                    var disks = GetDisks(false, safeMode);
                     var targetDisk = disks.FirstOrDefault(d => d.Partitions.Any(p => p.DriveLetter.Equals(sourceDriveLetter, StringComparison.OrdinalIgnoreCase)));
                     if (targetDisk != null && (targetDisk.Interface.Contains("USB", StringComparison.OrdinalIgnoreCase) || targetDisk.Interface.Contains("Removable", StringComparison.OrdinalIgnoreCase))) {
                         isRemovable = true;
@@ -1455,9 +2115,18 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 File.Delete(scriptPath);
 
                 // 4. VERIFICAÇÃO E CORREÇÃO DE LETRA (Crítico)
-                // Se o diskpart falhou em atribuir letra por causa do erro no 'active' ou delay do VDS
-                bool hasLetter = output.Contains("atribuiu com", StringComparison.OrdinalIgnoreCase) 
-                               || output.Contains("successfully assigned", StringComparison.OrdinalIgnoreCase);
+                // 🔥 NÃO DEPENDE DE STRINGS DE TEXTO - Usa WMI para verificar se a partição tem letra
+                // Isso funciona em qualquer idioma do Windows/ISO
+                bool hasLetter = false;
+                try
+                {
+                    await Task.Delay(1000); // Aguarda diskpart terminar
+                    var disksCheck = GetDisks(false, safeMode);
+                    var targetPartition = disksCheck.SelectMany(d => d.Partitions)
+                                                  .FirstOrDefault(p => p.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase));
+                    hasLetter = targetPartition != null && !string.IsNullOrEmpty(targetPartition.DriveLetter);
+                }
+                catch { }
 
                 if (!hasLetter)
                 {
@@ -1486,7 +2155,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
                 // Verificamos se agora temos uma partição com a letra
                 await Task.Delay(2000);
-                var disksAfter = GetDisks();
+                var disksAfter = GetDisks(false, safeMode);
                 var createdPart = disksAfter.SelectMany(d => d.Partitions)
                                             .FirstOrDefault(p => p.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase));
 
@@ -1514,22 +2183,27 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 if (string.IsNullOrWhiteSpace(user)) user = "LugiaUser"; // Fallback
             }
 
+            // 🔥 USA en-US COMO PADRÃO UNIVERSAL (WinPE em inglês funciona em qualquer idioma)
+            // Isso garante compatibilidade total com comandos e scripts que esperam output em inglês
+            const string systemLocale = "en-US";
+            const string inputLocale = "0409"; // en-US keyboard layout
+
             StringBuilder xml = new StringBuilder();
             xml.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             xml.AppendLine("<unattend xmlns=\"urn:schemas-microsoft-com:unattend\">");
-            
+
             // --- PASS 1: windowsPE (Setup Environment) ---
             xml.AppendLine("  <settings pass=\"windowsPE\">");
-            
+
             // 1.1 International (WinPE)
             xml.AppendLine("    <component name=\"Microsoft-Windows-International-Core-WinPE\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonVisual\" xmlns:wcm=\"http://schemas.microsoft.com/WCM/2002/Xml\">");
             xml.AppendLine("      <SetupUILanguage>");
-            xml.AppendLine("        <UILanguage>pt-BR</UILanguage>");
+            xml.AppendLine($"        <UILanguage>{systemLocale}</UILanguage>");
             xml.AppendLine("      </SetupUILanguage>");
-            xml.AppendLine("      <InputLocale>0416:00000416</InputLocale>");
-            xml.AppendLine("      <SystemLocale>pt-BR</SystemLocale>");
-            xml.AppendLine("      <UILanguage>pt-BR</UILanguage>");
-            xml.AppendLine("      <UserLocale>pt-BR</UserLocale>");
+            xml.AppendLine($"      <InputLocale>{inputLocale}:0000{inputLocale}</InputLocale>");
+            xml.AppendLine($"      <SystemLocale>{systemLocale}</SystemLocale>");
+            xml.AppendLine($"      <UILanguage>{systemLocale}</UILanguage>");
+            xml.AppendLine($"      <UserLocale>{systemLocale}</UserLocale>");
             xml.AppendLine("    </component>");
 
             // 1.2 Setup Configuration & Bypasses
@@ -1695,10 +2369,10 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             if (disablePrivacy)
             {
                 xml.AppendLine("    <component name=\"Microsoft-Windows-International-Core\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonVisual\" xmlns:wcm=\"http://schemas.microsoft.com/WCM/2002/Xml\">");
-                xml.AppendLine("      <InputLocale>0416:00000416</InputLocale>");
-                xml.AppendLine("      <SystemLocale>pt-BR</SystemLocale>");
-                xml.AppendLine("      <UILanguage>pt-BR</UILanguage>");
-                xml.AppendLine("      <UserLocale>pt-BR</UserLocale>");
+                xml.AppendLine("      <InputLocale>0409:00000409</InputLocale>");
+                xml.AppendLine("      <SystemLocale>en-US</SystemLocale>");
+                xml.AppendLine("      <UILanguage>en-US</UILanguage>");
+                xml.AppendLine("      <UserLocale>en-US</UserLocale>");
                 xml.AppendLine("    </component>");
             }
             xml.AppendLine("  </settings>");

@@ -30,49 +30,61 @@ namespace KitLugia.Core
                 {
                     // 1. CPU (Nome e Carga)
                     using (var searcher = new ManagementObjectSearcher("SELECT Name, LoadPercentage FROM Win32_Processor"))
+                    using (var results = searcher.Get())
                     {
-                        foreach (var item in searcher.Get())
+                        foreach (ManagementObject item in results)
                         {
-                            cpuName = item["Name"]?.ToString() ?? "CPU Genérica";
-                            cpuLoad = Convert.ToSingle(item["LoadPercentage"]);
-                            break; // Pega só o primeiro processador
+                            using (item)
+                            {
+                                cpuName = item["Name"]?.ToString() ?? "CPU Genérica";
+                                cpuLoad = Convert.ToSingle(item["LoadPercentage"]);
+                                break; // Pega só o primeiro processador
+                            }
                         }
                     }
 
                     // 2. RAM (Total e Livre)
                     // Usando Win32_OperatingSystem é mais rápido que Win32_PhysicalMemory para isso
                     using (var searcher = new ManagementObjectSearcher("SELECT TotalVisibleMemorySize, FreePhysicalMemory, Caption FROM Win32_OperatingSystem"))
+                    using (var results = searcher.Get())
                     {
-                        foreach (var item in searcher.Get())
+                        foreach (ManagementObject item in results)
                         {
-                            // WMI retorna em Kilobytes (KB)
-                            ulong totalKb = Convert.ToUInt64(item["TotalVisibleMemorySize"]);
-                            ulong freeKb = Convert.ToUInt64(item["FreePhysicalMemory"]);
-                            osName = item["Caption"]?.ToString() ?? "Windows";
+                            using (item)
+                            {
+                                // WMI retorna em Kilobytes (KB)
+                                ulong totalKb = Convert.ToUInt64(item["TotalVisibleMemorySize"]);
+                                ulong freeKb = Convert.ToUInt64(item["FreePhysicalMemory"]);
+                                osName = item["Caption"]?.ToString() ?? "Windows";
 
-                            ramTotal = totalKb / 1024.0 / 1024.0; // Converte KB para GB
-                            ramFree = freeKb / 1024.0 / 1024.0;
+                                ramTotal = totalKb / 1024.0 / 1024.0; // Converte KB para GB
+                                ramFree = freeKb / 1024.0 / 1024.0;
+                            }
                         }
                     }
 
                     // 3. GPU (Nome e VRAM Estimada)
                     using (var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController"))
+                    using (var results = searcher.Get())
                     {
-                        foreach (var item in searcher.Get())
+                        foreach (ManagementObject item in results)
                         {
-                            string name = item["Name"]?.ToString() ?? "";
-                            // Filtra o driver básico do Windows para tentar achar a GPU real
-                            if (!string.IsNullOrEmpty(name) && !name.Contains("Basic Display"))
+                            using (item)
                             {
-                                gpuName = name;
-                                try
+                                string name = item["Name"]?.ToString() ?? "";
+                                // Filtra o driver básico do Windows para tentar achar a GPU real
+                                if (!string.IsNullOrEmpty(name) && !name.Contains("Basic Display"))
                                 {
-                                    // AdapterRAM vem em Bytes. Convertendo para GB.
-                                    ulong vramBytes = Convert.ToUInt64(item["AdapterRAM"]);
-                                    gpuVram = vramBytes / 1024.0 / 1024.0 / 1024.0;
+                                    gpuName = name;
+                                    try
+                                    {
+                                        // AdapterRAM vem em Bytes. Convertendo para GB.
+                                        ulong vramBytes = Convert.ToUInt64(item["AdapterRAM"]);
+                                        gpuVram = vramBytes / 1024.0 / 1024.0 / 1024.0;
+                                    }
+                                    catch { gpuVram = 0; }
+                                    break;
                                 }
-                                catch { gpuVram = 0; }
-                                break;
                             }
                         }
                     }
@@ -82,21 +94,25 @@ namespace KitLugia.Core
                     try
                     {
                         using (var searcher = new ManagementObjectSearcher("SELECT Model, Size, Status FROM Win32_DiskDrive"))
+                        using (var results = searcher.Get())
                         {
-                            foreach (var item in searcher.Get())
+                            foreach (ManagementObject item in results)
                             {
-                                string model = item["Model"]?.ToString() ?? "Disco";
-                                string status = item["Status"]?.ToString() ?? "OK";
+                                using (item)
+                                {
+                                    string model = item["Model"]?.ToString() ?? "Disco";
+                                    string status = item["Status"]?.ToString() ?? "OK";
 
-                                // Formata saúde simples baseada no status do driver
-                                string health = status.ToUpper() == "OK" ? "Saudável" : "Verificar";
+                                    // Formata saúde simples baseada no status do driver
+                                    string health = status.ToUpper() == "OK" ? "Saudável" : "Verificar";
 
-                                storageList.Add(new StorageInfo(
-                                    model,
-                                    health,
-                                    0, // WMI padrão não lê temperatura de disco
-                                    "" // Letra da unidade é complexo de mapear no WMI simples, deixamos vazio
-                                ));
+                                    storageList.Add(new StorageInfo(
+                                        model,
+                                        health,
+                                        0, // WMI padrão não lê temperatura de disco
+                                        "" // Letra da unidade é complexo de mapear no WMI simples, deixamos vazio
+                                    ));
+                                }
                             }
                         }
                     }

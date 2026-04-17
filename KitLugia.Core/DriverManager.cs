@@ -27,31 +27,35 @@ namespace KitLugia.Core
                 try
                 {
                     using var searcher = new ManagementObjectSearcher("SELECT DeviceName, DriverProviderName, DriverVersion, DriverDate, InfName, DeviceID FROM Win32_PnPSignedDriver");
+                    using var results = searcher.Get();
 
-                    foreach (var item in searcher.Get())
+                    foreach (ManagementObject item in results)
                     {
-                        string provider = item["DriverProviderName"]?.ToString() ?? "Genérico";
-                        string name = item["DeviceName"]?.ToString() ?? "Dispositivo Desconhecido";
-
-                        bool isMicrosoft = provider == "Microsoft" || provider == "Microsoft Corporation";
-
-                        if (!string.IsNullOrEmpty(name) && (includeMicrosoft || !isMicrosoft))
+                        using (item)
                         {
-                            string rawDate = item["DriverDate"]?.ToString() ?? "";
-                            string prettyDate = rawDate;
+                            string provider = item["DriverProviderName"]?.ToString() ?? "Genérico";
+                            string name = item["DeviceName"]?.ToString() ?? "Dispositivo Desconhecido";
 
-                            if (rawDate.Length >= 8)
-                                prettyDate = $"{rawDate.Substring(6, 2)}/{rawDate.Substring(4, 2)}/{rawDate.Substring(0, 4)}";
+                            bool isMicrosoft = provider == "Microsoft" || provider == "Microsoft Corporation";
 
-                            list.Add(new DriverItem
+                            if (!string.IsNullOrEmpty(name) && (includeMicrosoft || !isMicrosoft))
                             {
-                                DeviceName = name,
-                                Provider = provider,
-                                Version = item["DriverVersion"]?.ToString() ?? "0.0.0.0",
-                                Date = prettyDate,
-                                InfName = item["InfName"]?.ToString() ?? "",
-                                HardwareId = item["DeviceID"]?.ToString() ?? ""
-                            });
+                                string rawDate = item["DriverDate"]?.ToString() ?? "";
+                                string prettyDate = rawDate;
+
+                                if (rawDate.Length >= 8)
+                                    prettyDate = $"{rawDate.Substring(6, 2)}/{rawDate.Substring(4, 2)}/{rawDate.Substring(0, 4)}";
+
+                                list.Add(new DriverItem
+                                {
+                                    DeviceName = name,
+                                    Provider = provider,
+                                    Version = item["DriverVersion"]?.ToString() ?? "0.0.0.0",
+                                    Date = prettyDate,
+                                    InfName = item["InfName"]?.ToString() ?? "",
+                                    HardwareId = item["DeviceID"]?.ToString() ?? ""
+                                });
+                            }
                         }
                     }
                 }

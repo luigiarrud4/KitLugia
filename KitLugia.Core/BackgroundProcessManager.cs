@@ -37,25 +37,29 @@ namespace KitLugia.Core
             {
                 var query = "SELECT Name, DisplayName, Description, State, StartMode FROM Win32_Service";
                 using var searcher = new ManagementObjectSearcher(query);
+                using var results = searcher.Get();
 
-                foreach (var item in searcher.Get().Cast<ManagementObject>())
+                foreach (ManagementObject item in results)
                 {
-                    string name = item["Name"]?.ToString() ?? "";
-                    string display = item["DisplayName"]?.ToString() ?? "";
-                    string desc = item["Description"]?.ToString() ?? "Sem descrição disponível.";
-                    string state = item["State"]?.ToString() ?? "Unknown";
-                    string startMode = item["StartMode"]?.ToString() ?? "Manual";
+                    using (item)
+                    {
+                        string name = item["Name"]?.ToString() ?? "";
+                        string display = item["DisplayName"]?.ToString() ?? "";
+                        string desc = item["Description"]?.ToString() ?? "Sem descrição disponível.";
+                        string state = item["State"]?.ToString() ?? "Unknown";
+                        string startMode = item["StartMode"]?.ToString() ?? "Manual";
 
-                    ServiceSafetyLevel safety = ServiceSafetyLevel.Unknown;
+                        ServiceSafetyLevel safety = ServiceSafetyLevel.Unknown;
 
-                    if (_criticalServices.Contains(name)) safety = ServiceSafetyLevel.Dangerous;
-                    else if (_safeToDisable.Contains(name)) safety = ServiceSafetyLevel.Safe;
-                    else safety = ServiceSafetyLevel.Caution;
+                        if (_criticalServices.Contains(name)) safety = ServiceSafetyLevel.Dangerous;
+                        else if (_safeToDisable.Contains(name)) safety = ServiceSafetyLevel.Safe;
+                        else safety = ServiceSafetyLevel.Caution;
 
-                    string uiStatus = state == "Running" ? "Executando" : "Parado";
-                    string uiStart = startMode == "Auto" ? "Automático" : (startMode == "Manual" ? "Manual" : "Desativado");
+                        string uiStatus = state == "Running" ? "Executando" : "Parado";
+                        string uiStart = startMode == "Auto" ? "Automático" : (startMode == "Manual" ? "Manual" : "Desativado");
 
-                    services.Add(new ServiceInfo(name, display, desc, uiStatus, uiStart, safety));
+                        services.Add(new ServiceInfo(name, display, desc, uiStatus, uiStart, safety));
+                    }
                 }
             }
             catch (Exception ex) { Logger.LogError("GetAllServices", ex.Message); }

@@ -306,11 +306,14 @@ namespace KitLugia.Core
                 using var searcher = new ManagementObjectSearcher("SELECT L2CacheSize FROM Win32_Processor");
                 foreach (ManagementObject obj in searcher.Get().Cast<ManagementObject>())
                 {
-                    var cacheSize = obj["L2CacheSize"];
-                    if (cacheSize != null)
+                    using (obj) // 🔥 LIMPEZA: Dispose do objeto WMI
                     {
-                        Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache", Convert.ToInt64(cacheSize), RegistryValueKind.DWord);
-                        break;
+                        var cacheSize = obj["L2CacheSize"];
+                        if (cacheSize != null)
+                        {
+                            Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache", Convert.ToInt64(cacheSize), RegistryValueKind.DWord);
+                            break;
+                        }
                     }
                 }
             }
@@ -446,7 +449,7 @@ namespace KitLugia.Core
                     td.Principal.RunLevel = TaskRunLevel.Highest;
                     
                     td.Triggers.Add(new LogonTrigger());
-                    td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath)));
+                    td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
                     
                     // Optimization: Do not wait for network, start immediately
                     td.Settings.DisallowStartIfOnBatteries = false;
@@ -523,6 +526,33 @@ namespace KitLugia.Core
         #endregion
 
         #region GPU & Gaming
+        /// <summary>
+        /// Obtém lista de nomes de GPUs. NÃO retorna ManagementObject para evitar memory leak.
+        /// </summary>
+        public static List<string> GetAllGpuNames()
+        {
+            var names = new List<string>();
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_VideoController");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    using (obj) // Garante dispose de cada objeto
+                    {
+                        string? name = obj["Name"]?.ToString();
+                        if (!string.IsNullOrEmpty(name))
+                            names.Add(name);
+                    }
+                }
+            }
+            catch { }
+            return names;
+        }
+
+        /// <summary>
+        /// Obtém lista de GPUs com dispose automático. Use apenas quando necessário.
+        /// </summary>
+        [Obsolete("Use GetAllGpuNames() para evitar memory leaks")]
         public static List<ManagementObject> GetAllGpus()
         {
             try
@@ -537,11 +567,19 @@ namespace KitLugia.Core
         {
             try
             {
-                var gpus = GetAllGpus();
-                return gpus.FirstOrDefault(gpu =>
-                    gpu["Name"]?.ToString()?.Contains("Microsoft Basic Display Adapter") == false);
+                using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    using (obj)
+                    {
+                        string? name = obj["Name"]?.ToString();
+                        if (!string.IsNullOrEmpty(name) && !name.Contains("Microsoft Basic Display Adapter"))
+                            return obj; // Retorna sem dispose - caller deve gerenciar
+                    }
+                }
             }
-            catch { return null; }
+            catch { }
+            return null;
         }
 
         public static string? FindGpuRegistryPath(ManagementObject gpu)
@@ -549,6 +587,19 @@ namespace KitLugia.Core
             try
             {
                 string gpuDescription = gpu["Description"]?.ToString() ?? gpu["Name"]?.ToString() ?? "";
+                if (string.IsNullOrEmpty(gpuDescription)) return null;
+                return FindGpuRegistryPathByDescription(gpuDescription);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Encontra o caminho do registro da GPU pelo nome/descrição. Versão segura sem ManagementObject.
+        /// </summary>
+        public static string? FindGpuRegistryPathByDescription(string gpuDescription)
+        {
+            try
+            {
                 if (string.IsNullOrEmpty(gpuDescription)) return null;
 
                 string videoClassGuid = "{4d36e968-e325-11ce-bfc1-08002be10318}";
@@ -769,6 +820,10 @@ namespace KitLugia.Core
         #endregion
 
         #region Network & Driver
+        /// <summary>
+        /// Obtém lista de adaptadores de rede ativos. IMPORTANTE: Caller deve descartar os ManagementObject.
+        /// </summary>
+        [Obsolete("Use apenas quando necessario - lembre-se de dar dispose nos objetos retornados")]
         public static List<ManagementObject> GetActiveNetworkAdapters()
         {
             try
@@ -787,9 +842,12 @@ namespace KitLugia.Core
             {
                 try
                 {
-                    var param = adapter.GetMethodParameters("SetDNSServerSearchOrder");
-                    param["DNSServerSearchOrder"] = (primaryDns == null) ? null : new string[] { primaryDns, secondaryDns! };
-                    adapter.InvokeMethod("SetDNSServerSearchOrder", param, null);
+                    using (adapter) // 🔥 LIMPEZA: Garante dispose do adapter
+                    {
+                        var param = adapter.GetMethodParameters("SetDNSServerSearchOrder");
+                        param["DNSServerSearchOrder"] = (primaryDns == null) ? null : new string[] { primaryDns, secondaryDns! };
+                        adapter.InvokeMethod("SetDNSServerSearchOrder", param, null);
+                    }
                 }
                 catch { }
             }
