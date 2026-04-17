@@ -15,8 +15,12 @@ namespace KitLugia.GUI
         // Evento para avisar a UI para rolar para o final
         public static event Action? OnLogAdded;
 
+        // 🔥 PROPERTIE: Modo debug (controla visibilidade do menu de debug, não o terminal)
+        public static bool IsDebugEnabled { get; set; } = false;
+
         public static void WriteLine(string message)
         {
+            // 🔥 Terminal sempre loga - não é afetado pelo modo debug
             if (Application.Current != null)
             {
                 Application.Current.Dispatcher.Invoke(() =>
@@ -38,7 +42,22 @@ namespace KitLugia.GUI
 
         public static void WriteError(string error)
         {
-            WriteLine($"[ERRO] {error}");
+            // 🔥 NOVO: Erros sempre são logados, mesmo com debug desativado
+            if (Application.Current != null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    string time = DateTime.Now.ToString("HH:mm:ss");
+                    Logs.Add($"[{time}] [ERRO] {error}");
+
+                    if (Logs.Count > 200)
+                    {
+                        Logs.RemoveAt(0);
+                    }
+
+                    OnLogAdded?.Invoke();
+                });
+            }
         }
 
         public static void Clear()

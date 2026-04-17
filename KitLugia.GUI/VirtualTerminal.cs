@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using KitLugia.GUI.Extensions;
 
 // --- CORREÇÃO DE AMBIGUIDADE ---
 using TextBox = System.Windows.Controls.TextBox;
@@ -98,11 +99,18 @@ namespace KitLugia.GUI
         /// </summary>
         public static void SubmitInput(string text)
         {
-            // Ecoa o que foi digitado na tela (igual um console real)
-            WriteLine(text);
-
-            // Cumpre a promessa, liberando o código antigo para continuar
             _inputTask?.TrySetResult(text);
+        }
+
+        /// <summary>
+        /// Limpa as referências estáticas para permitir GC dos controles UI
+        /// </summary>
+        public static void Cleanup()
+        {
+            _outputBlock = null;
+            _scroller = null;
+            _inputBox = null;
+            _inputTask = null;
         }
     }
 }

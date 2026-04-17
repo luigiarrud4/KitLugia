@@ -9,7 +9,8 @@
         Title="Kit Lugia - Gold Edition" Height="750" Width="1100"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBackground}"
-        ResizeMode="CanResizeWithGrip">
+        ResizeMode="CanResizeWithGrip"
+        Closing="Window_Closing">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
@@ -37,9 +38,9 @@
                         WindowChrome.IsHitTestVisibleInChrome="True" Margin="0,1,1,0" Panel.ZIndex="9999">
 
                 <!-- BOTÃO INTEGRIDADE (ESCUDO) -->
-                <RadioButton x:Name="BtnSecurity" GroupName="Menu" Tag="🛡️Scan" Content="Integridade do Sistema" 
+                <RadioButton x:Name="BtnIntegrity" GroupName="Menu" Tag="🧰" Content="Integridade do Sistema" 
                              Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"
-                             ToolTip="Scanner de Segurança (Antigo Menu [S])"/>
+                             ToolTip="Scanner de Integridade do Sistema"/>
 
                 <!-- BOTÃO ATUALIZAÇÃO (REFRESH) -->
                 <Button x:Name="BtnUpdate" Width="40" Height="32" Click="BtnUpdate_Click"
@@ -149,20 +150,54 @@
                 <Grid Margin="15,25">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0">
-                        <TextBlock Text="KIT LUGIA" FontSize="18" FontWeight="Bold" Margin="5,0,0,5" Foreground="{StaticResource AccentColor}">
-                            <TextBlock.Effect>
-                                <DropShadowEffect Color="#FFD700" BlurRadius="12" ShadowDepth="0" Opacity="0.5"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
-                        <TextBlock Text="U L T I M A T E   P E R F O R M A N C E" FontSize="10" Margin="5,0,0,20" Foreground="#808080" FontWeight="SemiBold"/>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="KIT LUGIA" FontSize="18" FontWeight="Bold" Margin="5,0,0,5" Foreground="{StaticResource AccentColor}">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect Color="#FFD700" BlurRadius="12" ShadowDepth="0" Opacity="0.5"/>
+                                </TextBlock.Effect>
+                            </TextBlock>
+                            <TextBlock Text="U L T I M A T E   P E R F O R M A N C E" FontSize="10" Margin="5,0,0,20" Foreground="#808080" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <!-- Botão Configurações (Engrenagem) -->
+                        <Button Grid.Column="1" x:Name="BtnSettings" 
+                                Content="⚙️" 
+                                FontSize="16"
+                                Width="36" Height="36"
+                                Margin="5,0,0,0"
+                                VerticalAlignment="Center"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="{StaticResource AccentColor}"
+                                ToolTip="Configurações do Kit Lugia"
+                                Click="BtnSettings_Click"
+                                Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bdr" Property="Background" Value="#15FFFFFF"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        </Grid>
 
                         <!-- BARRA DE PESQUISA -->
-                        <Grid Margin="0,0,0,15">
+                        <Grid Grid.Row="1" Margin="0,0,0,15">
                             <Border Background="#20FFFFFF" CornerRadius="6" Height="34" BorderBrush="{StaticResource CardBorder}" BorderThickness="1">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -232,17 +267,13 @@
                                 </Border>
                             </Popup>
                         </Grid>
-                    </StackPanel>
 
                     <!-- ITENS DE MENU -->
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Hidden">
                         <StackPanel>
                             <RadioButton x:Name="BtnDashboard" GroupName="Menu" Tag="🏠" Content="Sistema (Início)" IsChecked="True" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnTweaks"    GroupName="Menu" Tag="⚡" Content="Desempenho" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
-                            <RadioButton x:Name="BtnScreen"    GroupName="Menu" Tag="🖥️" Content="Tela e Cores" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnApps"      GroupName="Menu" Tag="📱" Content="Aplicativos (Bloat)" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
-                            <RadioButton x:Name="BtnIntegrity"  GroupName="Menu" Tag="🔐" Content="Segurança e Privacidade" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"
-                             ToolTip="Configurações de Segurança e Privacidade"/>
                             <RadioButton x:Name="BtnStorage"   GroupName="Menu" Tag="💿" Content="Armazenamento" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnPartitions" GroupName="Menu" Tag="💽" Content="Gerenciar Discos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnNetwork"   GroupName="Menu" Tag="🌐" Content="Rede e Internet" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
@@ -254,18 +285,26 @@
                     </ScrollViewer>
 
                     <!-- RODAPÉ DO MENU (SOBRE + MONITOR) -->
-                    <StackPanel Grid.Row="2">
+                    <StackPanel Grid.Row="3">
                         <Separator Background="{StaticResource CardBorder}" Margin="0,10" Opacity="0.5"/>
                         <RadioButton x:Name="BtnTray" GroupName="Menu" Tag="🔔" Content="📡 Monitor RAM (Tray)" 
                                      Style="{StaticResource NavButtonStyle}" 
                                      Foreground="{StaticResource TextMuted}"
                                      Click="NavButton_Click"
                                      ToolTip="Configurações do ícone na bandeja e monitor de RAM"/>
-                        <!-- BOTÃO "SOBRE O PROJETO" ATUALIZADO COM O CLICK -->
-                        <RadioButton GroupName="Menu" Tag="⚙️" Content="Sobre o Projeto" 
+                        <!-- BOTÃO GAMEBOOST PRO (ANTIGO SOBRE) -->
+                        <RadioButton x:Name="BtnGameBoost" GroupName="Menu" Tag="🚀" Content="GameBoost Pro" 
                                      Style="{StaticResource NavButtonStyle}" 
-                                     Foreground="{StaticResource TextMuted}"
-                                     Click="NavButton_Click"/>
+                                     Foreground="{StaticResource AccentColor}"
+                                     Click="NavButton_Click"
+                                     ToolTip="GameBoost Inteligente - Algoritmo ProBalance Style"/>
+                        
+                        <!-- BOTÃO DIAGNÓSTICO -->
+                        <RadioButton x:Name="BtnDiagnostic" GroupName="Menu" Tag="🔬" Content="Diagnóstico (Debug)" 
+                                     Style="{StaticResource NavButtonStyle}" 
+                                     Foreground="#FF4444"
+                                     Click="NavButton_Click"
+                                     ToolTip="Diagnóstico interno - Monitorar timers e leaks"/>
                     </StackPanel>
                 </Grid>
             </Border>

@@ -19,6 +19,7 @@ using Button = System.Windows.Controls.Button; // 🔥 Corrige ambiguidade
 // Estas linhas forçam o código a usar os componentes do WPF
 using RadioButton = System.Windows.Controls.RadioButton;
 using Application = System.Windows.Application;
+using Logger = KitLugia.Core.Logger;
 
 namespace KitLugia.GUI
 {
@@ -28,6 +29,10 @@ namespace KitLugia.GUI
         private Dictionary<string, LugiaToast> _activeToasts = new Dictionary<string, LugiaToast>();
         private TaskCompletionSource<bool>? _confirmCompletionSource;
 
+        // 🔥 CORREÇÃO: Armazenar handlers para poder removê-los no cleanup
+        private Action<string>? _logHandler;
+        private Action? _notificationCountHandler;
+
         // Tray Icon RAM Monitor
         private TrayIconService? _trayService;
         public TrayIconService? TrayService => _trayService;
@@ -35,13 +40,22 @@ namespace KitLugia.GUI
         // Timer para o Debounce da pesquisa
         private DispatcherTimer _searchDebounceTimer;
 
+        // 🔥 NOVO: healthCheckTimer precisa ser parado no Cleanup
+        private DispatcherTimer? _healthCheckTimer;
+
         // Single-instance show window signaling
         private System.Threading.EventWaitHandle? _showWindowEvent;
         private System.Threading.Thread? _showWindowMonitor;
 
+        // 🔥 NOVO: CancellationTokenSource para cancelar tasks de background
+        private CancellationTokenSource? _backgroundTasksCts;
+
         public MainWindow()
         {
             InitializeComponent();
+
+            // 🔥 NOVO: Inicializa CancellationTokenSource para tasks de background
+            _backgroundTasksCts = new CancellationTokenSource();
 
             // Inicializa a Engine de Busca
             SearchEngine.Initialize();
@@ -50,15 +64,23 @@ namespace KitLugia.GUI
             _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
             _searchDebounceTimer.Tick += SearchDebounce_Tick;
 
-            // Inicia na Dashboard
+            // Inicia na Dashboard (navegação segura)
             MainFrame.Navigate(new DashboardPage());
             if (BtnDashboard != null) BtnDashboard.IsChecked = true;
+            
+            // Limpa histórico inicial para evitar acúmulo desde o início
+            while (MainFrame.NavigationService.CanGoBack)
+            {
+                MainFrame.NavigationService.RemoveBackEntry();
+            }
 
             // Conecta o Logger do Core ao Console da GUI
-            KitLugia.Core.Logger.OnLogReceived += (msg) => ConsoleManager.WriteLine(msg);
+            _logHandler = (msg) => ConsoleManager.WriteLine(msg);
+            KitLugia.Core.Logger.OnLogReceived += _logHandler;
 
             // Conecta o contador de notificações
-            NotificationHistoryManager.OnCountChanged += UpdateNotificationBadge;
+            _notificationCountHandler = UpdateNotificationBadge;
+            NotificationHistoryManager.OnCountChanged += _notificationCountHandler;
 
             // Configura o fechamento do painel de console (Rodapé)
             if (GlobalConsolePanel != null)
@@ -93,6 +115,10 @@ namespace KitLugia.GUI
             };
             _trayService.Initialize();
 
+            // 🔥 REMOVIDO: Monitoramento contínuo - não pausa quando janela perde foco
+            // O GameBoost continua funcionando mesmo com a janela minimizada
+            // Logs rotativos de foreground foram removidos para evitar acumulo
+
             // --- AUTO-START: Garante que o app inicie com o Windows se o Tray estiver ativo ---
             if (TrayIconService.IsTrayEnabledStatic())
             {
@@ -104,10 +130,10 @@ namespace KitLugia.GUI
                 Logger.Log($"Tray ativo: {TrayIconService.IsTrayEnabledStatic()}");
                 
                 // 🔥 CHECK 5: Verificação de saúde do Tray Icon após 3 segundos
-                var healthCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-                healthCheckTimer.Tick += (s, e) =>
+                _healthCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                _healthCheckTimer.Tick += (s, e) =>
                 {
-                    healthCheckTimer.Stop();
+                    _healthCheckTimer?.Stop();
                     if (_trayService != null && !_trayService.IsTrayIconHealthy())
                     {
                         Logger.Log("❌ Tray Icon não está saudável, tentando recuperar...");
@@ -125,30 +151,49 @@ namespace KitLugia.GUI
                         Logger.Log("✅ Tray Icon está saudável");
                     }
                 };
-                healthCheckTimer.Start();
+                _healthCheckTimer.Start();
             }
 
-            // 🔥 AUTO-UPDATER: Inicia verificação automática em background
+            // 🔥 AUTO-UPDATER: Inicia verificação automática em background com CancellationToken
             _ = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(10)); // Espera 10s para iniciar
-                await GitHubUpdater.StartAutoUpdateCheck();
-            });
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), _backgroundTasksCts.Token); // Espera 10s para iniciar
+                    if (!_backgroundTasksCts.Token.IsCancellationRequested)
+                    {
+                        await GitHubUpdater.StartAutoUpdateCheck();
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Task foi cancelada, não fazer nada
+                }
+            }, _backgroundTasksCts.Token);
+
+            // --- INTELLIGENT MEMORY CLEANER: Limpeza baseada em limite de memória ---
+            AggressiveMemoryCleaner.StartIntelligentMonitoring(5, 80); // Verifica a cada 5s, limpa em 80MB
+            Logger.Log("🧹 MemoryCleaner inteligente iniciado - Limite: 80MB, Verificação: 5s");
+
+            // --- MODO DESENVOLVEDOR: Inicializa com menu de debug OCULTO por padrão ---
+            UpdateDebugMenuVisibility(false);
 
             // --- NAMED EVENT: Permite que uma segunda instância sinalize para mostrar a janela ---
             _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "KitLugia_ShowWindow");
             _showWindowMonitor = new System.Threading.Thread(() =>
             {
-                while (true)
+                while (!_backgroundTasksCts.Token.IsCancellationRequested)
                 {
-                    _showWindowEvent.WaitOne();
-                    Dispatcher.Invoke(() =>
+                    if (_showWindowEvent.WaitOne(1000)) // Timeout de 1s para verificar cancelamento
                     {
-                        Show();
-                        WindowState = WindowState.Normal;
-                        Activate();
-                        Focus();
-                    });
+                        Dispatcher.Invoke(() =>
+                        {
+                            Show();
+                            WindowState = WindowState.Normal;
+                            Activate();
+                            Focus();
+                        });
+                    }
                 }
             }) { IsBackground = true, Name = "ShowWindowMonitor" };
             _showWindowMonitor.Start();
@@ -196,7 +241,7 @@ namespace KitLugia.GUI
             else
             {
                 UncheckAllNavButtons();
-                MainFrame.Navigate(new GlobalSearchPage(query));
+                CleanupAndNavigate(new GlobalSearchPage(query));
             }
         }
 
@@ -239,8 +284,7 @@ namespace KitLugia.GUI
         {
             if (MainFrame.Content is DashboardPage) BtnDashboard.IsChecked = true;
             else if (MainFrame.Content is TweaksPage) BtnTweaks.IsChecked = true;
-            else if (MainFrame.Content is ScreenPage) BtnScreen.IsChecked = true;
-            else if (MainFrame.Content is BloatwarePage) BtnApps.IsChecked = true;
+                        else if (MainFrame.Content is BloatwarePage) BtnApps.IsChecked = true;
             else if (MainFrame.Content is CleanupPage) BtnStorage.IsChecked = true;
             else if (MainFrame.Content is NetworkPage) BtnNetwork.IsChecked = true;
             else if (MainFrame.Content is GamesPage) BtnGames.IsChecked = true;
@@ -249,14 +293,23 @@ namespace KitLugia.GUI
             else if (MainFrame.Content is DriversPage) BtnDrivers.IsChecked = true;
             else if (MainFrame.Content is PartitionsPage) BtnPartitions.IsChecked = true;
             else if (MainFrame.Content is TraySettingsPage) { if (BtnTray != null) BtnTray.IsChecked = true; }
+            else if (MainFrame.Content is IntegrityPage) { if (BtnIntegrity != null) BtnIntegrity.IsChecked = true; }
+            else if (MainFrame.Content is GameBoostPage) { if (BtnGameBoost != null) BtnGameBoost.IsChecked = true; }
+            else if (MainFrame.Content is ToolsPage) { }
+            else if (MainFrame.Content is WinbootPage) { }
+            else if (MainFrame.Content is AdvancedToolsPage) { }
+            else if (MainFrame.Content is SecurityPage) { }
+            else if (MainFrame.Content is PrivacyPage) { }
+            else if (MainFrame.Content is ActivationPage) { }
+            else if (MainFrame.Content is UpdatePage) { }
+            else if (MainFrame.Content is DiagnosticPage) { if (BtnDiagnostic != null) BtnDiagnostic.IsChecked = true; }
         }
 
         private void UncheckAllNavButtons()
         {
             if (BtnDashboard != null) BtnDashboard.IsChecked = false;
             if (BtnTweaks != null) BtnTweaks.IsChecked = false;
-            if (BtnScreen != null) BtnScreen.IsChecked = false;
-            if (BtnApps != null) BtnApps.IsChecked = false;
+                        if (BtnApps != null) BtnApps.IsChecked = false;
             if (BtnStorage != null) BtnStorage.IsChecked = false;
             if (BtnNetwork != null) BtnNetwork.IsChecked = false;
             if (BtnGames != null) BtnGames.IsChecked = false;
@@ -265,10 +318,10 @@ namespace KitLugia.GUI
             if (BtnDrivers != null) BtnDrivers.IsChecked = false;
             if (BtnPartitions != null) BtnPartitions.IsChecked = false;
 
-            // CORREÇÃO: Garante que o botão de segurança no topo também seja desmarcado
-            if (BtnSecurity != null) BtnSecurity.IsChecked = false;
+            // CORREÇÃO: Garante que o botão de integridade no topo também seja desmarcado
             if (BtnIntegrity != null) BtnIntegrity.IsChecked = false;
             if (BtnTray != null) BtnTray.IsChecked = false;
+            if (BtnDiagnostic != null) BtnDiagnostic.IsChecked = false;
         }
 
         public void NavigateToPage(string? pageTag, object? senderButton = null)
@@ -314,8 +367,7 @@ namespace KitLugia.GUI
                 {
                     case "🏠": if (BtnDashboard != null) BtnDashboard.IsChecked = true; break;
                     case "⚡": if (BtnTweaks != null) BtnTweaks.IsChecked = true; break;
-                    case "🖥️": if (BtnScreen != null) BtnScreen.IsChecked = true; break;
-                    case "📱": if (BtnApps != null) BtnApps.IsChecked = true; break;
+                                        case "📱": if (BtnApps != null) BtnApps.IsChecked = true; break;
                     case "💿": if (BtnStorage != null) BtnStorage.IsChecked = true; break;
                     case "🌐": if (BtnNetwork != null) BtnNetwork.IsChecked = true; break;
                     case "🎮": if (BtnGames != null) BtnGames.IsChecked = true; break;
@@ -323,8 +375,10 @@ namespace KitLugia.GUI
                     case "🔧": if (BtnRepairs != null) BtnRepairs.IsChecked = true; break;
                     case "💾": if (BtnDrivers != null) BtnDrivers.IsChecked = true; break;
                     case "💽": if (BtnPartitions != null) BtnPartitions.IsChecked = true; break;
-                    case "🛡️Scan": if (BtnSecurity != null) BtnSecurity.IsChecked = true; break;
-                case "🔐": if (BtnIntegrity != null) BtnIntegrity.IsChecked = true; break;
+                    case "🧰": if (BtnIntegrity != null) BtnIntegrity.IsChecked = true; break;
+                    case "�": if (BtnTray != null) BtnTray.IsChecked = true; break;
+                    case "🚀": if (BtnGameBoost != null) BtnGameBoost.IsChecked = true; break;
+                    case "🔬": if (BtnDiagnostic != null) BtnDiagnostic.IsChecked = true; break;
                 }
             }
 
@@ -338,28 +392,82 @@ namespace KitLugia.GUI
                 "🌐" => new NetworkPage(),
                 "🎮" => new GamesPage(),
                 "🛠️" => new ToolsPage(tabIndex),
-                "🚀" => new AdvancedToolsPage(),
+                "🚀" => new GameBoostPage(), // 🔥 NOVO: GameBoost Pro
                 "🛡️" => new ServicesPage(tabIndex),
                 "🔧" => new RepairsPage(),
                 "💾" => new DriversPage(),
                 "💽" => new PartitionsPage(),
-                "🛡️Scan" => new IntegrityPage(),
+                "💻" => new WinbootPage(), // 🔥 NOVO: WinBoot (Instalação Windows)
+                "🔨" => new AdvancedToolsPage(), // 🔥 NOVO: Winhance + WinBoot + Partições
+                "🧰" => new IntegrityPage(), // 🔥 NOVO: Integridade do Sistema (Scan)
+                "🛡️ShutUp" => new ServicesPage(1), // 🔥 NOVO: O&O ShutUp10 (tab 1)
                 "🔐" => new SecurityPage(),
                 "⚙️" => new TweaksPage(), // Otimização integrada em Tweaks
                 "🔒" => new PrivacyPage(),
                 "🔑" => new ActivationPage(),
                 "🔔" => new TraySettingsPage(),
                 "🔄" => new UpdatePage(), // 🔥 Página de atualizações
+                "🔬" => new DiagnosticPage(), // 🔥 NOVO: Diagnóstico Interno
                 _ => null
             };
 
             if (newPage != null)
             {
-                MainFrame.Navigate(newPage);
+                // 🔥 LIMPEZA CRÍTICA: Libera página anterior e limpa histórico
+                CleanupAndNavigate(newPage);
             }
             else
             {
                 ShowInfo("EM BREVE", "Página em desenvolvimento.");
+            }
+        }
+
+        /// <summary>
+        /// Navegação simples - apenas navega para a nova página.
+        /// </summary>
+        private void CleanupAndNavigate(Page newPage)
+        {
+            try
+            {
+                // 🔥 CORREÇÃO: Chamar Cleanup() da página anterior para liberar recursos
+                if (MainFrame.Content is Page previousPage)
+                {
+                    // Usa reflection para chamar o método Cleanup() se existir
+                    var cleanupMethod = previousPage.GetType().GetMethod("Cleanup", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    if (cleanupMethod != null)
+                    {
+                        try
+                        {
+                            cleanupMethod.Invoke(previousPage, null);
+                        }
+                        catch { }
+                    }
+                }
+
+                // 🔥 CORREÇÃO: Cria nova instância sempre (já é o padrão do Navigate)
+                // O WPF não reutiliza instâncias de Page por padrão
+                MainFrame.Navigate(newPage);
+
+                // 🔥 CORREÇÃO: Força GC para liberar memória imediatamente
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        // Remove todas as entradas do histórico
+                        while (MainFrame.NavigationService.CanGoBack)
+                            MainFrame.NavigationService.RemoveBackEntry();
+
+                        // 🔥 Força GC para liberar memória das páginas anteriores
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
+                        GC.Collect();
+                    }
+                    catch { }
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"⚠️ Erro na navegação: {ex.Message}");
             }
         }
 
@@ -389,6 +497,78 @@ namespace KitLugia.GUI
                 GlobalConsolePanel.Visibility = GlobalConsolePanel.Visibility == Visibility.Collapsed 
                     ? Visibility.Visible 
                     : Visibility.Collapsed;
+            }
+        }
+
+        // ⚙️ CONFIGURAÇÕES: Abre página de configurações
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Logger.Log("⚙️ Abrindo configurações...");
+                CleanupAndNavigate(new SettingsPage());
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnSettings_Click", $"Erro: {ex.Message}");
+                ShowError("❌ Erro", "Não foi possível abrir configurações");
+            }
+        }
+
+        // � MODO DESENVOLVEDOR: Atualiza visibilidade do menu de debug
+        public void UpdateDebugMenuVisibility(bool isDeveloperMode)
+        {
+            try
+            {
+                // Mostrar/esconder botão de diagnóstico
+                if (BtnDiagnostic != null)
+                {
+                    BtnDiagnostic.Visibility = isDeveloperMode ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                // Mostrar/esconder console global
+                if (GlobalConsolePanel != null)
+                {
+                    GlobalConsolePanel.Visibility = isDeveloperMode ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                // Logger.Log($"🐛 Modo desenvolvedor: {(isDeveloperMode ? "ATIVADO" : "DESATIVADO")}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("UpdateDebugMenuVisibility", $"Erro: {ex.Message}");
+            }
+        }
+
+        // �🔥 LIMPEZA MANUAL: Botão para forçar limpeza de memory leaks
+        private async void BtnCleanMemory_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("🧹 Iniciando limpeza manual de memory leaks...");
+                
+                var result = await AggressiveMemoryCleaner.PerformAggressiveCleanup();
+                
+                var message = $"""
+                    ✅ Limpeza Concluída!
+                    
+                    Memória antes: {result.MemoryBefore / 1024 / 1024:F1} MB
+                    Memória depois: {result.MemoryAfter / 1024 / 1024:F1} MB
+                    Liberado: {result.Freed / 1024 / 1024:F1} MB
+                    
+                    Total acumulado liberado: {AggressiveMemoryCleaner.TotalMemoryFreed / 1024 / 1024:F1} MB
+                    Limpezas realizadas: {AggressiveMemoryCleaner.CleanupCount}
+                    """;
+                
+                Logger.Log(message);
+                
+                // Mostra notificação de confirmação
+                ShowSuccess("🧹 Limpeza Concluída", $"Liberados {result.Freed / 1024 / 1024:F1} MB");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnCleanMemory", $"Erro na limpeza: {ex.Message}");
+                ShowError("❌ Erro", "Falha na limpeza de memória");
             }
         }
 
@@ -587,6 +767,79 @@ namespace KitLugia.GUI
             {
                 HideLoading();
             }
+        }
+
+        /// <summary>
+        /// Cleanup de recursos e handlers para evitar memory leaks
+        /// </summary>
+        private void Cleanup()
+        {
+            try
+            {
+                // 🔥 CORREÇÃO: Cancelar todas as tasks de background
+                if (_backgroundTasksCts != null)
+                {
+                    _backgroundTasksCts.Cancel();
+                    _backgroundTasksCts.Dispose();
+                    _backgroundTasksCts = null;
+                }
+
+                // 🔥 CORREÇÃO: Parar AggressiveMemoryCleaner
+                AggressiveMemoryCleaner.StopIntelligentMonitoring();
+
+                // 🔥 CORREÇÃO: Remover handlers de eventos estáticos para evitar memory leak
+                if (_logHandler != null)
+                {
+                    KitLugia.Core.Logger.OnLogReceived -= _logHandler;
+                    _logHandler = null;
+                }
+                if (_notificationCountHandler != null)
+                {
+                    NotificationHistoryManager.OnCountChanged -= _notificationCountHandler;
+                    _notificationCountHandler = null;
+                }
+
+                // Limpa o timer de debounce
+                _searchDebounceTimer?.Stop();
+
+                // 🔥 CORREÇÃO: Parar healthCheckTimer
+                _healthCheckTimer?.Stop();
+
+                // Limpa o serviço de tray
+                _trayService?.Dispose();
+
+                // Limpa toasts ativos
+                _activeToasts.Clear();
+
+                // 🔥 CORREÇÃO: Dispose do EventWaitHandle
+                _showWindowEvent?.Dispose();
+                _showWindowEvent = null;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("MainWindow.Cleanup", ex.Message);
+            }
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            // Verificar se deve minimizar para tray em vez de fechar
+            if (TrayService != null && TrayService.CloseToTray && TrayService.IsTrayEnabled)
+            {
+                e.Cancel = true; // Cancelar o fechamento
+                this.Hide(); // Minimizar para tray
+                KitLugia.Core.Logger.Log("🔔 Janela minimizada para Tray (Close to Tray ativado)");
+            }
+            else
+            {
+                KitLugia.Core.Logger.Log("👋 Fechando aplicação (Close to Tray desativado ou Tray desativado)");
+            }
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            Cleanup();
+            base.OnClosed(e);
         }
 
         #endregion
